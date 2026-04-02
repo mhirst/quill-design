@@ -34,15 +34,20 @@ export function useCanvas() {
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
-  // When selection mode changes, tell the iframe
-  useEffect(() => {
+  // Send selection mode to iframe (called after iframe loads and on mode toggle)
+  const sendSelectionMode = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow) return;
     iframe.contentWindow.postMessage(
       { type: selectionMode ? 'ENABLE_SELECTION_MODE' : 'DISABLE_SELECTION_MODE' },
       '*'
     );
-  }, [selectionMode, dataUri]); // re-send after iframe reloads (dataUri change)
+  }, [selectionMode]);
+
+  // When mode toggles while iframe is already loaded, update it immediately
+  useEffect(() => {
+    sendSelectionMode();
+  }, [selectionMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadJsx = useCallback((jsx: string) => {
     setSelection(null);
@@ -71,5 +76,6 @@ export function useCanvas() {
     clearSelection,
     selectionMode,
     toggleSelectionMode,
+    onIframeLoad: sendSelectionMode,
   };
 }

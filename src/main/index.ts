@@ -1,6 +1,10 @@
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
+import { config } from 'dotenv';
 import { registerIpcHandlers } from './ipc-handlers';
+
+// Load .env for dev (no-op in production — env vars set by OS/packager)
+config({ path: path.join(process.cwd(), '.env') });
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {

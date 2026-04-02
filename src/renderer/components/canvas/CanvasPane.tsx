@@ -12,6 +12,7 @@ interface Props {
   selectionMode: boolean;
   onToggleSelectionMode: () => void;
   onClearSelection: () => void;
+  onIframeLoad: () => void;
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
@@ -27,6 +28,7 @@ export function CanvasPane({
   selectionMode,
   onToggleSelectionMode,
   onClearSelection,
+  onIframeLoad,
   onOpen,
   onSave,
   onSaveAs,
@@ -68,6 +70,7 @@ export function CanvasPane({
             referrerPolicy="no-referrer"
             className="w-full h-full border-0 bg-white"
             title="Design Canvas"
+            onLoad={onIframeLoad}
           />
         )}
 

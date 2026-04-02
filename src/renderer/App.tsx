@@ -74,6 +74,7 @@ export default function App() {
           selectionMode={canvas.selectionMode}
           onToggleSelectionMode={canvas.toggleSelectionMode}
           onClearSelection={canvas.clearSelection}
+          onIframeLoad={canvas.onIframeLoad}
           onOpen={handleOpen}
           onSave={handleSave}
           onSaveAs={handleSaveAs}
