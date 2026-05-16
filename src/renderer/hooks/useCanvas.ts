@@ -1,6 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ElementSelection } from '@shared/types';
 import { buildSandboxDataUri } from '../lib/sandbox-template';
+import { patchTailwindClass } from '../lib/utils';
+
+export interface LayerNode {
+  tag: string;
+  id: string | null;
+  className: string;
+  path: string;
+  children: LayerNode[];
+}
+
+export interface DragEndPayload {
+  dx: number;
+  dy: number;
+  className: string;
+  descriptor: string;
+}
 
 export function useCanvas() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -8,11 +24,14 @@ export function useCanvas() {
   const [dataUri, setDataUri] = useState<string>('');
   const [selection, setSelection] = useState<ElementSelection | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
+  const [layerTree, setLayerTree] = useState<LayerNode | null>(null);
+  const onDragEndRef = useRef<((payload: DragEndPayload) => void) | null>(null);
 
   // Rebuild data URI whenever JSX changes
   useEffect(() => {
     if (!currentJsx) {
       setDataUri('');
+      setLayerTree(null);
       return;
     }
     setDataUri(buildSandboxDataUri(currentJsx));
@@ -28,13 +47,21 @@ export function useCanvas() {
       if (e.data.type === 'ELEMENT_SELECTED') {
         setSelection(e.data.payload as ElementSelection);
       }
+
+      if (e.data.type === 'LAYER_TREE_RESPONSE') {
+        setLayerTree(e.data.tree as LayerNode);
+      }
+
+      if (e.data.type === 'ELEMENT_DRAG_END') {
+        onDragEndRef.current?.(e.data as DragEndPayload);
+      }
     }
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
-  // Send selection mode to iframe (called after iframe loads and on mode toggle)
+  // Send selection mode to iframe
   const sendSelectionMode = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow) return;
@@ -44,13 +71,35 @@ export function useCanvas() {
     );
   }, [selectionMode]);
 
-  // When mode toggles while iframe is already loaded, update it immediately
   useEffect(() => {
     sendSelectionMode();
   }, [selectionMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Request layer tree from iframe (called after load)
+  const requestLayerTree = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    // Small delay to let React render inside iframe
+    setTimeout(() => {
+      iframe.contentWindow?.postMessage({ type: 'GET_LAYER_TREE' }, '*');
+    }, 200);
+  }, []);
+
+  const highlightByPath = useCallback((nodePath: string) => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage({ type: 'HIGHLIGHT_BY_PATH', path: nodePath }, '*');
+  }, []);
+
+  const patchElementClasses = useCallback((descriptor: string, newClasses: string) => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage({ type: 'PATCH_ELEMENT_CLASSES', descriptor, newClasses }, '*');
+  }, []);
+
   const loadJsx = useCallback((jsx: string) => {
     setSelection(null);
+    setLayerTree(null);
     setCurrentJsx(jsx);
   }, []);
 
@@ -67,6 +116,15 @@ export function useCanvas() {
     setSelection(null);
   }, []);
 
+  const onIframeLoad = useCallback(() => {
+    sendSelectionMode();
+    requestLayerTree();
+  }, [sendSelectionMode, requestLayerTree]);
+
+  const setOnDragEnd = useCallback((fn: (payload: DragEndPayload) => void) => {
+    onDragEndRef.current = fn;
+  }, []);
+
   return {
     iframeRef,
     dataUri,
@@ -76,6 +134,11 @@ export function useCanvas() {
     clearSelection,
     selectionMode,
     toggleSelectionMode,
-    onIframeLoad: sendSelectionMode,
+    onIframeLoad,
+    layerTree,
+    requestLayerTree,
+    highlightByPath,
+    patchElementClasses,
+    setOnDragEnd,
   };
 }

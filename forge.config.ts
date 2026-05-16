@@ -5,9 +5,27 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    name: 'Claude Design Tool',
+    name: 'Quill',
+    executableName: 'quill',
+    appVersion: '1.0.0',
+    icon: 'assets/icon',
+    extraResource: ['.env', 'assets/icon.png', 'assets/icon.ico'],
+    win32metadata: {
+      CompanyName: 'Quill',
+      FileDescription: 'Design beautiful UIs with AI — powered by Claude.',
+      ProductName: 'Quill',
+    },
   },
-  makers: [new MakerSquirrel({ name: 'claude_design_tool' })],
+  makers: [
+    new MakerSquirrel({
+      name: 'quill',
+      setupExe: 'QuillSetup.exe',
+      setupIcon: 'assets/icon.ico',
+      authors: 'Quill',
+      description: 'Design beautiful UIs with AI — powered by Claude.',
+      noMsi: true,
+    }),
+  ],
   plugins: [
     new VitePlugin({
       build: [

@@ -1,10 +1,15 @@
 import { ipcMain, app, BrowserWindow } from 'electron';
+import fs from 'fs';
+import path from 'path';
 import { IPC } from '../shared/ipc-channels';
+import { getApiKey, setApiKey, deleteApiKey, validateApiKey } from './key-manager';
 import type {
   StreamStartPayload,
   FileWritePayload,
   FileReadPayload,
   WatchPayload,
+  SilentPatchPayload,
+  RecentProject,
 } from '../shared/types';
 import {
   openFileDialog,
@@ -14,7 +19,15 @@ import {
   watchFile,
   stopWatchingFile,
 } from './file-manager';
-import { streamMessage, abortStream, extractJsx } from './claude-client';
+import { streamMessage, abortStream, extractJsx, silentPatch } from './claude-client';
+import {
+  openFolderDialog,
+  scanProjectDirectory,
+  watchProjectDirectory,
+  stopWatchingDirectory,
+  getRecentProjects,
+  addRecentProject,
+} from './project-manager';
 
 export function registerIpcHandlers(win: BrowserWindow): void {
   // ── File: open dialog ──────────────────────────────────────────────────────
@@ -49,7 +62,7 @@ export function registerIpcHandlers(win: BrowserWindow): void {
 
   // ── Claude: stream ─────────────────────────────────────────────────────────
   ipcMain.handle(IPC.CLAUDE_STREAM_START, async (_e, payload: StreamStartPayload) => {
-    const { conversationId, messages, currentJsx, selection, filePath } = payload;
+    const { conversationId, messages, currentJsx, selection, filePath, selectedFrameName } = payload;
 
     // Build the final user message with context injected
     const lastMessage = messages[messages.length - 1];
@@ -57,6 +70,12 @@ export function registerIpcHandlers(win: BrowserWindow): void {
 
     // Build contextual user message (inject JSX + selection context)
     const contextParts: string[] = [];
+
+    if (selectedFrameName) {
+      contextParts.push(`## Canvas context\nThe user has a frame named "${selectedFrameName}" selected. Design content that fits inside this frame. If modifying an existing component, work with the current JSX below.`);
+    } else if (!currentJsx) {
+      contextParts.push(`## Canvas context\nNo frame is selected. Generate a new self-contained React component. It will be placed in a new frame on the canvas.`);
+    }
 
     if (currentJsx) {
       contextParts.push(`## Current component\n\`\`\`jsx\n${currentJsx}\n\`\`\``);
@@ -125,6 +144,86 @@ export function registerIpcHandlers(win: BrowserWindow): void {
     abortStream(conversationId);
   });
 
+  // ── Claude: silent patch ───────────────────────────────────────────────────
+  ipcMain.handle(IPC.CLAUDE_SILENT_PATCH, async (_e, payload: SilentPatchPayload) => {
+    const { currentJsx, descriptor, originalClasses, newClasses, filePath } = payload;
+    const jsx = await silentPatch(currentJsx, descriptor, originalClasses, newClasses);
+    if (jsx && filePath) {
+      try { writeFile(filePath, jsx); } catch { /* ignore */ }
+    }
+    return { finalJsx: jsx };
+  });
+
+  // ── Project: open folder dialog ────────────────────────────────────────────
+  ipcMain.handle(IPC.PROJECT_OPEN_DIALOG, async () => {
+    return openFolderDialog();
+  });
+
+  // ── Project: scan directory ────────────────────────────────────────────────
+  ipcMain.handle(IPC.PROJECT_SCAN, (_e, { rootPath }: { rootPath: string }) => {
+    return scanProjectDirectory(rootPath);
+  });
+
+  // ── Project: watch directory ───────────────────────────────────────────────
+  ipcMain.handle(IPC.PROJECT_WATCH_START, (_e, { rootPath }: { rootPath: string }) => {
+    watchProjectDirectory(rootPath, win, IPC.PROJECT_FILE_CHANGED);
+  });
+
+  ipcMain.handle(IPC.PROJECT_WATCH_STOP, (_e, { rootPath }: { rootPath: string }) => {
+    stopWatchingDirectory(rootPath);
+  });
+
+  // ── Project: recents ───────────────────────────────────────────────────────
+  ipcMain.handle(IPC.PROJECT_GET_RECENTS, () => {
+    return getRecentProjects();
+  });
+
+  ipcMain.handle(IPC.PROJECT_ADD_RECENT, (_e, project: RecentProject) => {
+    addRecentProject(project);
+  });
+
+  // ── API key ────────────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.API_KEY_GET, () => {
+    const key = getApiKey();
+    return { key, hasKey: !!key };
+  });
+
+  ipcMain.handle(IPC.API_KEY_SET, (_e, { key }: { key: string }) => {
+    setApiKey(key);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC.API_KEY_DELETE, () => {
+    deleteApiKey();
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC.API_KEY_VALIDATE, async (_e, { key }: { key: string }) => {
+    return validateApiKey(key);
+  });
+
   // ── App ────────────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.APP_GET_VERSION, () => app.getVersion());
+
+  // ── Store: read/write JSON persistence in userData ─────────────────────────
+  const storePath = path.join(app.getPath('userData'), 'quill-store.json');
+
+  ipcMain.handle(IPC.STORE_READ, () => {
+    try {
+      if (!fs.existsSync(storePath)) return { data: null };
+      const raw = fs.readFileSync(storePath, 'utf-8');
+      return { data: JSON.parse(raw) };
+    } catch {
+      return { data: null };
+    }
+  });
+
+  ipcMain.handle(IPC.STORE_WRITE, (_e, { data }: { data: unknown }) => {
+    try {
+      fs.writeFileSync(storePath, JSON.stringify(data, null, 2), 'utf-8');
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
+  });
 }

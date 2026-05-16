@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#0f0f0f"/>
+
+  <!-- Quill feather -->
+  <!-- Main feather body — large elegant curved shape -->
+  <path
+    d="M380 72
+       C420 90, 450 140, 440 200
+       C430 260, 390 310, 340 350
+       C300 382, 252 400, 210 410
+       C240 370, 260 330, 255 290
+       C250 250, 230 215, 220 180
+       C270 200, 310 190, 340 160
+       C310 180, 265 185, 245 165
+       C260 130, 310 90, 380 72Z"
+    fill="url(#featherGrad)"
+    opacity="0.95"
+  />
+
+  <!-- Feather vane detail lines -->
+  <path d="M340 160 C310 180, 265 185, 245 165" stroke="#a78bfa" stroke-width="2" fill="none" opacity="0.5"/>
+  <path d="M355 190 C325 205, 278 208, 258 188" stroke="#a78bfa" stroke-width="1.5" fill="none" opacity="0.4"/>
+  <path d="M362 225 C335 238, 292 240, 270 220" stroke="#a78bfa" stroke-width="1.5" fill="none" opacity="0.35"/>
+  <path d="M360 260 C338 272, 300 273, 278 255" stroke="#a78bfa" stroke-width="1.5" fill="none" opacity="0.3"/>
+  <path d="M348 294 C330 304, 298 304, 276 288" stroke="#a78bfa" stroke-width="1.5" fill="none" opacity="0.25"/>
+
+  <!-- Quill shaft / spine -->
+  <path
+    d="M380 72 C340 130, 280 200, 240 290 C228 318, 218 355, 210 410"
+    stroke="url(#shaftGrad)"
+    stroke-width="4"
+    fill="none"
+    stroke-linecap="round"
+  />
+
+  <!-- Nib tip -->
+  <path
+    d="M210 410 C205 428, 198 445, 188 460
+       C196 448, 208 435, 215 418
+       C218 410, 212 405, 210 410Z"
+    fill="#7c6ff7"
+    opacity="0.9"
+  />
+
+  <!-- Ink drop at nib -->
+  <ellipse cx="190" cy="462" rx="6" ry="8" fill="#7c6ff7" opacity="0.8"/>
+  <ellipse cx="190" cy="462" rx="3" ry="4" fill="#c4b5fd" opacity="0.6"/>
+
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="featherGrad" x1="380" y1="72" x2="210" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="40%" stop-color="#7c6ff7"/>
+      <stop offset="100%" stop-color="#4c3d9e"/>
+    </linearGradient>
+    <linearGradient id="shaftGrad" x1="380" y1="72" x2="210" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#e2d9ff"/>
+      <stop offset="100%" stop-color="#7c6ff7"/>
+    </linearGradient>
+  </defs>
+</svg>

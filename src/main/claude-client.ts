@@ -1,24 +1,31 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { ClaudeApiMessage } from '../shared/types';
 
-const SYSTEM_PROMPT = `You are an expert React and Tailwind CSS component engineer embedded in a visual design tool.
+const SYSTEM_PROMPT = `You are an expert React + Tailwind CSS UI engineer embedded in Quill, a visual design tool.
 
-Your role is to generate and modify React functional components based on user instructions.
+## Environment
+- React 18 (createRoot). Hook globals: \`useState\`, \`useEffect\`, \`useRef\`, \`useCallback\`, \`useMemo\`, \`useReducer\`
+- Tailwind CSS via CDN (all utilities available, including arbitrary values like \`w-[320px]\`)
+- NO imports, NO exports — component is injected directly into a pre-built sandbox
+- NO network calls, NO external images (use placeholder colors/gradients instead)
+- lucide-react is NOT available — use inline SVGs or emoji for icons if needed
 
-## Output rules
-1. Always output a SINGLE, complete, self-contained React component named \`App\`.
-2. Wrap the component in a markdown code block: \`\`\`jsx ... \`\`\`
-3. Use only React (useState, useEffect, useRef, useCallback are available globally — do NOT import them).
-4. Use Tailwind CSS utility classes for all styling. Do NOT use inline styles unless absolutely necessary.
-5. Do NOT write any import or export statements — the component is injected into a pre-built environment.
-6. The component must be renderable standalone — no external data, no network calls.
-7. Make it visually polished and production-ready.
-8. After the code block, you may add a brief explanation (1–3 sentences max).
+## Output format
+1. Output exactly ONE markdown code block: \`\`\`jsx\\n...\\n\`\`\`
+2. The component MUST be named \`App\` (no default export, just the function declaration)
+3. After the code block, optionally add 1–2 sentences of plain-text explanation
+
+## Quality bar
+- Dark mode by default — use slate/gray dark backgrounds unless asked for light
+- Pixel-perfect spacing, proper visual hierarchy, real-feeling data/copy
+- Use Tailwind gradients, shadows, rings, and transitions for polish
+- Make interactive elements (buttons, inputs, tabs) actually work with useState
+- If generating a multi-panel layout, fill all panels with realistic content
 
 ## When modifying an existing component
-- Return the COMPLETE updated component, not a diff or partial snippet.
-- Preserve all existing functionality unless the user explicitly asks to remove it.
-- Only change what the user requested.`;
+- Return the COMPLETE updated component — never a partial diff
+- Preserve all functionality not mentioned in the request
+- Make only the minimum changes needed`;
 
 const JSX_BLOCK_REGEX = /```(?:jsx?|tsx?)\n([\s\S]+?)```/;
 
@@ -80,5 +87,44 @@ export function abortStream(conversationId: string): void {
   if (controller) {
     controller.abort();
     activeStreams.delete(conversationId);
+  }
+}
+
+const SILENT_PATCH_SYSTEM = `You are a JSX component patcher. Update Tailwind classes on a specific element in a React component.
+Return ONLY the complete updated component wrapped in \`\`\`jsx....\`\`\`. Make no other changes. Do not explain anything.`;
+
+export async function silentPatch(
+  currentJsx: string,
+  descriptor: string,
+  originalClasses: string,
+  newClasses: string
+): Promise<string | null> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const userMessage = `Element to update: ${descriptor}
+Current classes: ${originalClasses}
+New classes: ${newClasses}
+
+## Component
+\`\`\`jsx
+${currentJsx}
+\`\`\``;
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20250514',
+      max_tokens: 4096,
+      system: SILENT_PATCH_SYSTEM,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const text = response.content
+      .filter((b) => b.type === 'text')
+      .map((b) => (b as { type: 'text'; text: string }).text)
+      .join('');
+
+    return extractJsx(text);
+  } catch {
+    return null;
   }
 }

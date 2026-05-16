@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '../../lib/utils';
+import { Sparkles, Check, LoaderCircle } from 'lucide-react';
+import { stripJsxBlock } from '../../lib/utils';
 import type { ChatMessage as ChatMessageType } from '@shared/types';
 
 interface Props {
@@ -11,40 +12,65 @@ interface Props {
 
 export function ChatMessage({ message, isStreaming, streamingContent }: Props) {
   const isUser = message.role === 'user';
-  const content = isStreaming && streamingContent ? streamingContent : message.content;
+
+  // ── User message ─────────────────────────────────────────────────────────
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div
+          className="max-w-[85%] px-3 py-2 whitespace-pre-wrap"
+          style={{
+            background: 'var(--accent)',
+            color: '#fff',
+            borderRadius: '12px 12px 3px 12px',
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}
+        >
+          {message.content}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Assistant message ─────────────────────────────────────────────────────
+  // While streaming: ONLY show the task pill. No raw text ever.
+  if (isStreaming) {
+    return (
+      <div className="flex gap-2 justify-start">
+        <AssistantAvatar />
+        <TaskPill done={false} />
+      </div>
+    );
+  }
+
+  // After streaming: show completed pill + explanation text (if any)
+  const explanationText = stripJsxBlock(message.content).trim();
+  const hadCode = /```(?:jsx?|tsx?)/.test(message.content);
 
   return (
-    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
-      <div
-        className={cn(
-          'max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
-          isUser
-            ? 'bg-indigo-600 text-white rounded-br-sm'
-            : 'bg-slate-800 text-slate-100 rounded-bl-sm'
-        )}
-      >
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{content}</p>
-        ) : (
-          <div className="prose prose-sm prose-invert max-w-none">
+    <div className="flex gap-2 justify-start">
+      <AssistantAvatar />
+      <div className="flex flex-col gap-1.5 max-w-[85%]">
+        {hadCode && <TaskPill done={true} />}
+        {explanationText && (
+          <div
+            className="px-3 py-2 rounded-xl leading-relaxed"
+            style={{
+              background: 'var(--panel-alt)',
+              color: 'var(--text)',
+              borderRadius: '3px 12px 12px 12px',
+              fontSize: 13,
+            }}
+          >
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code({ className, children, ...props }) {
-                  const isBlock = className?.includes('language-');
-                  return isBlock ? (
+                code({ children, ...props }) {
+                  return (
                     <code
-                      className={cn(
-                        'block bg-slate-900/80 rounded-lg p-3 text-xs overflow-x-auto',
-                        className
-                      )}
-                      {...props}
-                    >
-                      {children}
-                    </code>
-                  ) : (
-                    <code
-                      className="bg-slate-900/60 rounded px-1 py-0.5 text-xs text-indigo-300"
+                      className="rounded px-1 py-0.5 text-xs"
+                      style={{ background: 'var(--input-bg)', color: 'var(--accent)' }}
                       {...props}
                     >
                       {children}
@@ -54,16 +80,52 @@ export function ChatMessage({ message, isStreaming, streamingContent }: Props) {
                 pre({ children }) {
                   return <pre className="not-prose">{children}</pre>;
                 },
+                p({ children }) {
+                  return <p style={{ margin: '0 0 4px' }}>{children}</p>;
+                },
               }}
             >
-              {content}
+              {explanationText}
             </ReactMarkdown>
-            {isStreaming && (
-              <span className="inline-block w-1.5 h-4 bg-indigo-400 animate-pulse ml-0.5 align-middle" />
-            )}
           </div>
         )}
+        {!hadCode && !explanationText && (
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Done.</div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function AssistantAvatar() {
+  return (
+    <div
+      className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center mt-0.5"
+      style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}
+    >
+      <Sparkles size={12} />
+    </div>
+  );
+}
+
+function TaskPill({ done }: { done: boolean }) {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-1.5 rounded-lg w-fit"
+      style={{
+        fontSize: 13,
+        background: 'var(--accent-dim)',
+        border: `1px solid color-mix(in srgb, var(--accent) ${done ? 25 : 16}%, transparent)`,
+      }}
+    >
+      {done ? (
+        <Check size={11} className="flex-shrink-0" style={{ color: 'var(--accent)' }} />
+      ) : (
+        <LoaderCircle size={11} className="animate-spin flex-shrink-0" style={{ color: 'var(--accent)' }} />
+      )}
+      <span style={{ color: done ? 'var(--text)' : 'var(--muted)' }}>
+        {done ? 'Component ready' : 'Generating component…'}
+      </span>
     </div>
   );
 }

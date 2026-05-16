@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { ChatMessage, ClaudeApiMessage, ElementSelection } from '@shared/types';
 import { extractJsx } from '../lib/utils';
+import { analytics } from '../lib/analytics';
 
 const MAX_HISTORY = 20; // 10 turns
 
@@ -10,14 +11,21 @@ interface UseChatOptions {
   getCurrentJsx: () => string;
   getSelection: () => ElementSelection | null;
   getFilePath: () => string | null;
+  getSelectedFrameName?: () => string | null;
+  initialMessages?: ChatMessage[];
+  onMessagesChange?: (messages: ChatMessage[]) => void;
 }
 
-export function useChat({ onJsxReady, getCurrentJsx, getSelection, getFilePath }: UseChatOptions) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function useChat({ onJsxReady, getCurrentJsx, getSelection, getFilePath, getSelectedFrameName, initialMessages, onMessagesChange }: UseChatOptions) {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages ?? []);
+  const onMessagesChangeRef = useRef(onMessagesChange);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const conversationIdRef = useRef<string>(uuidv4());
   const streamingIdRef = useRef<string | null>(null);
+  // Keep a ref to streaming content so the onStreamEnd handler can read it without stale closure
+  const streamingContentRef = useRef('');
+  onMessagesChangeRef.current = onMessagesChange;
 
   // Subscribe to streaming events
   useEffect(() => {
@@ -40,10 +48,15 @@ export function useChat({ onJsxReady, getCurrentJsx, getSelection, getFilePath }
         extractedJsx: data.finalJsx ?? undefined,
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) => {
+        const next = [...prev, assistantMsg];
+        onMessagesChangeRef.current?.(next);
+        return next;
+      });
       setStreamingContent('');
       streamingIdRef.current = null;
 
+      analytics.track('ai_generation_completed', { has_jsx: !!data.finalJsx });
       if (data.finalJsx) {
         onJsxReady(data.finalJsx);
       }
@@ -71,8 +84,7 @@ export function useChat({ onJsxReady, getCurrentJsx, getSelection, getFilePath }
     };
   }, [onJsxReady]);
 
-  // Keep a ref to streaming content so the onStreamEnd handler can read it
-  const streamingContentRef = useRef('');
+  // Keep streamingContentRef in sync with state
   useEffect(() => {
     streamingContentRef.current = streamingContent;
   }, [streamingContent]);
@@ -90,6 +102,7 @@ export function useChat({ onJsxReady, getCurrentJsx, getSelection, getFilePath }
 
       const updatedMessages = [...messages, userMsg];
       setMessages(updatedMessages);
+      onMessagesChangeRef.current?.(updatedMessages);
       setIsStreaming(true);
       streamingIdRef.current = uuidv4();
 
@@ -100,12 +113,14 @@ export function useChat({ onJsxReady, getCurrentJsx, getSelection, getFilePath }
 
       conversationIdRef.current = uuidv4();
 
+      analytics.track('ai_generation_started', { prompt_length: userText.trim().length });
       await window.api.claudeStreamStart({
         conversationId: conversationIdRef.current,
         messages: apiMessages,
         currentJsx: getCurrentJsx(),
         selection: getSelection(),
         filePath: getFilePath(),
+        selectedFrameName: getSelectedFrameName?.() ?? null,
       });
     },
     [isStreaming, messages, getCurrentJsx, getSelection, getFilePath]

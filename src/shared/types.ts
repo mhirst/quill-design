@@ -13,8 +13,56 @@ export interface ElementSelection {
     margin: string;
     borderRadius: string;
     display: string;
+    flexDirection: string;
+    justifyContent: string;
+    alignItems: string;
+    gap: string;
+    lineHeight: string;
+    letterSpacing: string;
+    borderWidth: string;
+    borderColor: string;
+    opacity: string;
+    width: string;
+    height: string;
+    position: string;
+    top: string;
+    left: string;
   };
   descriptor: string; // e.g. "button.bg-blue-500#submit"
+}
+
+// Project browser types
+export interface ProjectFile {
+  name: string;
+  path: string;
+  relativePath: string;
+}
+
+export interface ProjectFolder {
+  name: string;
+  path: string;
+  relativePath: string;
+  files: ProjectFile[];
+  folders: ProjectFolder[];
+}
+
+export interface RecentProject {
+  rootPath: string;
+  name: string;
+  lastOpened: number;
+}
+
+export interface SilentPatchPayload {
+  currentJsx: string;
+  descriptor: string;
+  originalClasses: string;
+  newClasses: string;
+  filePath: string | null;
+}
+
+export interface ProjectFileChangedPayload {
+  filePath: string;
+  content: string;
 }
 
 export interface ClaudeApiMessage {
@@ -38,6 +86,7 @@ export interface StreamStartPayload {
   currentJsx: string;
   selection: ElementSelection | null;
   filePath: string | null;
+  selectedFrameName?: string | null; // name of selected frame, if any
 }
 
 export interface FileWritePayload {

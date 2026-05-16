@@ -15,8 +15,30 @@ export const IPC = {
   CLAUDE_STREAM_ERROR: 'claude:stream-error',
   CLAUDE_STREAM_ABORT: 'claude:stream-abort',
 
+  // Claude silent patch (non-streaming, direct invoke)
+  CLAUDE_SILENT_PATCH: 'claude:silent-patch',
+
+  // Project browser
+  PROJECT_OPEN_DIALOG: 'project:open-dialog',
+  PROJECT_SCAN: 'project:scan',
+  PROJECT_WATCH_START: 'project:watch-start',
+  PROJECT_WATCH_STOP: 'project:watch-stop',
+  PROJECT_FILE_CHANGED: 'project:file-changed',
+  PROJECT_GET_RECENTS: 'project:get-recents',
+  PROJECT_ADD_RECENT: 'project:add-recent',
+
+  // API key management
+  API_KEY_GET: 'apikey:get',
+  API_KEY_SET: 'apikey:set',
+  API_KEY_DELETE: 'apikey:delete',
+  API_KEY_VALIDATE: 'apikey:validate',
+
   // App
   APP_GET_VERSION: 'app:get-version',
+
+  // Project store (userData persistence)
+  STORE_READ: 'store:read',
+  STORE_WRITE: 'store:write',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
