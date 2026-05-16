@@ -43,10 +43,24 @@ Quill is a lightweight, open-source design canvas that lets you create and itera
 git clone https://github.com/mhirst/quill-design.git
 cd quill-design
 npm install
-npm run dev
+npm start
 ```
 
 On first launch, Quill will ask for your Anthropic API key. It's stored locally on your machine and never sent anywhere except to the Anthropic API.
+
+### Alternative: browser dev mode
+
+If you want to run the UI in Chrome without Electron (faster iteration, DevTools):
+
+```bash
+# Terminal 1 — backend
+npm run dev
+
+# Terminal 2 — frontend
+npm run dev:ui
+```
+
+Then open `http://localhost:5173` in Chrome.
 
 ### Build a distributable
 
@@ -54,7 +68,7 @@ On first launch, Quill will ask for your Anthropic API key. It's stored locally 
 npm run make
 ```
 
-The packaged app will be in `out/`.
+The packaged app will be in `out/`. On Windows this produces a Squirrel installer (`QuillSetup.exe`). Mac/Linux support is planned.
 
 ---
 
