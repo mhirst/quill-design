@@ -1,5 +1,7 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 
 const isMac = process.platform === 'darwin';
@@ -12,8 +14,8 @@ const config: ForgeConfig = {
     executableName: 'quill',
     appVersion: '1.0.0',
     icon: 'assets/icon',
-    // NOTE: do NOT include .env here — API keys are stored in the system
-    // userData directory via the onboarding flow, not bundled with the app.
+    // API keys are stored in the system userData directory via onboarding —
+    // never bundle .env or any credentials with the app.
     extraResource: isWin
       ? ['assets/icon.png', 'assets/icon.ico']
       : ['assets/icon.png'],
@@ -26,6 +28,7 @@ const config: ForgeConfig = {
     } : {}),
   },
   makers: [
+    // Windows — Squirrel installer
     ...(isWin ? [new MakerSquirrel({
       name: 'quill',
       setupExe: 'QuillSetup.exe',
@@ -34,6 +37,14 @@ const config: ForgeConfig = {
       description: 'Design beautiful UIs with AI — powered by Claude.',
       noMsi: true,
     })] : []),
+    // macOS — DMG (requires .icns icon, generated in CI)
+    ...(isMac ? [new MakerDMG({
+      name: 'Quill',
+      icon: 'assets/icon.icns',
+      overwrite: true,
+    })] : []),
+    // All platforms — ZIP fallback (used in CI for all targets)
+    new MakerZIP({}, ['darwin', 'linux', 'win32']),
   ],
   plugins: [
     new VitePlugin({

@@ -6,6 +6,14 @@ Quill is a lightweight, open-source design canvas that lets you create and itera
 
 ---
 
+## Download
+
+**[→ Download the latest release](https://github.com/mhirst/quill-design/releases/latest)**
+
+Pre-built binaries for Windows, macOS, and Linux are available on the Releases page. No build step required — just download, install, and bring your own [Anthropic API key](https://console.anthropic.com/settings/keys).
+
+---
+
 ## Features
 
 - **AI generation** — describe a component or layout in plain English and Claude renders it on the canvas
@@ -24,7 +32,7 @@ Quill is a lightweight, open-source design canvas that lets you create and itera
 ## Tech Stack
 
 - **Electron** + **Vite** — cross-platform desktop app with fast HMR dev experience
-- **React 18** + **TypeScript** — fully typed renderer
+- **React 19** + **TypeScript** — fully typed renderer
 - **Claude (Anthropic API)** — streaming AI generation via the Messages API
 - **PostHog** — privacy-respecting usage analytics (respects Do Not Track)
 
@@ -32,12 +40,21 @@ Quill is a lightweight, open-source design canvas that lets you create and itera
 
 ## Getting Started
 
-### Prerequisites
+You'll need an [Anthropic API key](https://console.anthropic.com/settings/keys) (starts with `sk-ant-`). On first launch, Quill will walk you through entering it — your key is stored locally and never leaves your machine.
 
-- Node.js 18+
-- An [Anthropic API key](https://console.anthropic.com/settings/keys) (starts with `sk-ant-`)
+### Option A — Download a binary (recommended)
 
-### Install & run
+Go to [Releases](https://github.com/mhirst/quill-design/releases) and download the build for your platform:
+
+| Platform | File |
+|----------|------|
+| Windows  | `QuillSetup.exe` |
+| macOS    | `Quill.dmg` |
+| Linux    | `quill-linux.zip` |
+
+### Option B — Build from source
+
+**Requirements:** Node.js 20+
 
 ```bash
 git clone https://github.com/mhirst/quill-design.git
@@ -46,50 +63,49 @@ npm install
 npm start
 ```
 
-On first launch, Quill will ask for your Anthropic API key. It's stored locally on your machine and never sent anywhere except to the Anthropic API.
+> First start takes ~30 seconds while Vite compiles everything. Subsequent starts are faster.
 
-### Alternative: browser dev mode
+### Option C — Browser dev mode (no Electron)
 
-If you want to run the UI in Chrome without Electron (faster iteration, DevTools):
+Faster for UI development — runs the renderer in Chrome with full DevTools:
 
 ```bash
-# Terminal 1 — backend
+# Terminal 1 — API backend
 npm run dev
 
-# Terminal 2 — frontend
+# Terminal 2 — Vite renderer
 npm run dev:ui
 ```
 
-Then open `http://localhost:5173` in Chrome.
-
-### Build a distributable
-
-```bash
-npm run make
-```
-
-The packaged app will be in `out/`. On Windows this produces a Squirrel installer (`QuillSetup.exe`). Mac/Linux support is planned.
+Then open `http://localhost:5173`.
 
 ---
 
 ## Usage
 
-1. **Draw** — select a shape tool from the toolbar (rectangle, ellipse, text, pen) and draw on the canvas
-2. **Describe** — open the AI panel and type what you want: *"a blue card with a shadow and rounded corners"*
-3. **Edit** — click any shape to select it, then drag handles to resize or use the inspect panel to change properties
-4. **Export** — click JSX to copy the design as React code, or PNG to download an image
+1. **Describe** — type what you want in the chat bar: *"a mobile login screen with a gradient background"*
+2. **Draw** — select a shape tool (rectangle, ellipse, text, pen) and draw directly on the canvas
+3. **Edit** — click any element to inspect and edit its properties; drag handles to resize
+4. **Export** — copy the design as React/JSX or download as PNG
 
 ---
 
-## Configuration
+## Releasing
 
-Quill stores your API key in the system keychain via Electron's `safeStorage`. No config files to manage.
+Releases are built automatically by GitHub Actions when you push a version tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+This builds for Windows (`.exe`), macOS (`.dmg`), and Linux (`.zip`) and creates a draft GitHub Release with all artifacts attached. Publish the draft when ready.
 
 ---
 
 ## Contributing
 
-Pull requests welcome. The codebase is structured as a standard Electron app:
+Pull requests welcome. The codebase is a standard Electron + Vite app:
 
 ```
 src/

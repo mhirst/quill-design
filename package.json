@@ -11,12 +11,17 @@
     "dev": "npx tsx dev-server.ts",
     "dev:ui": "vite --config vite.renderer.config.ts"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["design", "ai", "electron", "claude", "react"],
+  "author": "mhirst",
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-dmg": "^7.11.1",
     "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
     "@electron-forge/plugin-vite": "^7.11.1",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/postcss": "^4.2.2",
