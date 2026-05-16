@@ -116,13 +116,16 @@ export function StreamPreview({ streamingContent, isStreaming }: Props) {
   const color = PHASE_COLOR[stats.phase];
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg)', zIndex: 20 }}>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', zIndex: 20, pointerEvents: hasPreview ? 'none' : 'auto' }}>
 
       {/* ── Status bar ── */}
       <div style={{
         flexShrink: 0, height: 36,
         display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px',
-        borderBottom: '1px solid var(--border)', background: 'var(--panel)',
+        borderBottom: '1px solid var(--border)',
+        background: 'color-mix(in srgb, var(--panel) 85%, transparent)',
+        backdropFilter: 'blur(12px)',
+        pointerEvents: 'all',
       }}>
         {/* Pulsing dot */}
         <PulseDot color={color} />
@@ -163,7 +166,7 @@ export function StreamPreview({ streamingContent, isStreaming }: Props) {
 
       {/* ── Preview / skeleton ── */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {/* Persistent iframe — always mounted, updated via srcdoc */}
+        {/* Persistent live-preview iframe — fades in once JSX is renderable */}
         <iframe
           ref={iframeRef}
           sandbox="allow-scripts"
@@ -172,21 +175,32 @@ export function StreamPreview({ streamingContent, isStreaming }: Props) {
             position: 'absolute', inset: 0, width: '100%', height: '100%',
             border: 'none', background: 'white',
             opacity: hasPreview ? 1 : 0,
-            transition: 'opacity 0.3s ease',
+            transition: 'opacity 0.4s ease',
+            pointerEvents: hasPreview ? 'all' : 'none',
           }}
           title="Stream Preview"
         />
 
-        {/* Skeleton while thinking / no preview yet */}
-        {!hasPreview && (
+        {/* Skeleton overlay — visible until we have a live preview, then fades out */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          background: hasPreview
+            ? 'transparent'
+            : 'color-mix(in srgb, var(--bg) 70%, transparent)',
+          backdropFilter: hasPreview ? 'none' : 'blur(6px)',
+          opacity: hasPreview ? 0 : 1,
+          transition: 'opacity 0.4s ease, background 0.4s ease',
+          pointerEvents: 'none',
+        }}>
           <ThinkingSkeleton phase={stats.phase} dots={dots} />
-        )}
+        </div>
 
-        {/* Subtle scanline */}
+        {/* Subtle scanline on top of live preview */}
         {hasPreview && (
           <div style={{
             position: 'absolute', inset: 0, pointerEvents: 'none',
-            backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.025) 3px,rgba(0,0,0,0.025) 4px)',
+            backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.018) 3px,rgba(0,0,0,0.018) 4px)',
           }} />
         )}
       </div>
@@ -223,7 +237,7 @@ function StatPill({ value, label }: { value: number; label: string }) {
 function ThinkingSkeleton({ phase, dots }: { phase: StreamPhase; dots: string }) {
   const rows = [62, 80, 48, 72, 55, 88, 42, 65];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 28 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28 }}>
       <div style={{
         width: '100%', maxWidth: 340, padding: '18px 20px',
         background: '#0c0c0c', borderRadius: 10, border: '1px solid #2a2a2a',
