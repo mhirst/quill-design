@@ -97,6 +97,8 @@ import { FocusMode } from './components/canvas/FocusMode';
 import { CursorPresence, CursorPresencePanel } from './components/canvas/CursorPresence';
 import { GradientEditorPanel } from './components/canvas/GradientEditorPanel';
 import { KeyframeTimeline } from './components/canvas/KeyframeTimeline';
+import { ColorContrastPanel } from './components/canvas/ColorContrastPanel';
+import { LayoutInspectorOverlay } from './components/canvas/LayoutInspectorOverlay';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -463,6 +465,8 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showPresencePanel, setShowPresencePanel] = useState(false);
   const [showGradientEditor, setShowGradientEditor] = useState(false);
   const [showKeyframeTimeline, setShowKeyframeTimeline] = useState(false);
+  const [showColorContrast, setShowColorContrast] = useState(false);
+  const [showLayoutInspector, setShowLayoutInspector] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -970,9 +974,15 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowCodeExport(o => !o); return; }
             break;
           }
+          // ── 2 — Color Contrast Checker ────────────────────────────────────
+          case '2': {
+            if (e.shiftKey) { e.preventDefault(); setShowColorContrast(v => !v); return; }
+            break;
+          }
           // ── 3 — 3D Transform ──────────────────────────────────────────────
           case '3': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShow3DTransform(v => !v); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowLayoutInspector(v => !v); return; }
             break;
           }
           // ── ] [ — Z-order ─────────────────────────────────────────────────
@@ -2076,6 +2086,18 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             />
           )}
 
+          {/* Layout Inspector overlay (⌘⇧3) */}
+          <LayoutInspectorOverlay
+            shapes={drawing.state.shapes}
+            selectedIds={drawing.state.selectedIds.length > 0 ? drawing.state.selectedIds : (drawing.state.selectedId ? [drawing.state.selectedId] : [])}
+            zoom={viewport.zoom}
+            panX={viewport.panX}
+            panY={viewport.panY}
+            canvasWidth={canvasSize.width}
+            canvasHeight={canvasSize.height}
+            active={showLayoutInspector}
+          />
+
           {/* Focus Mode — dims canvas except selected shapes (⌘⇧F) */}
           <FocusMode
             shapes={drawing.state.shapes}
@@ -2295,6 +2317,14 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }}
         />
       )}
+
+      {/* Color Contrast Checker (⌘⇧2) */}
+      <ColorContrastPanel
+        open={showColorContrast}
+        onClose={() => setShowColorContrast(false)}
+        shapes={drawing.state.shapes}
+        selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+      />
 
       {/* Gradient Editor Panel (⌘⇧⌥G) */}
       <GradientEditorPanel

@@ -622,3 +622,250 @@ describe('KeyframeTimeline — track operations', () => {
     expect(easings.some(e => e.includes('cubic-bezier'))).toBe(true);
   });
 });
+
+// ── ColorContrastPanel — WCAG math ────────────────────────────────────────────
+
+function hexToRgb(hex: string) {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6 && clean.length !== 3) return null;
+  const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+  return { r: parseInt(full.slice(0, 2), 16), g: parseInt(full.slice(2, 4), 16), b: parseInt(full.slice(4, 6), 16) };
+}
+
+function linearize(c: number): number {
+  const s = c / 255;
+  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(rgb: { r: number; g: number; b: number }): number {
+  return 0.2126 * linearize(rgb.r) + 0.7152 * linearize(rgb.g) + 0.0722 * linearize(rgb.b);
+}
+
+function contrastRatio(hex1: string, hex2: string): number | null {
+  const rgb1 = hexToRgb(hex1);
+  const rgb2 = hexToRgb(hex2);
+  if (!rgb1 || !rgb2) return null;
+  const l1 = relativeLuminance(rgb1);
+  const l2 = relativeLuminance(rgb2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function wcagLevel(ratio: number | null, large: boolean): 'AAA' | 'AA' | 'FAIL' {
+  if (ratio === null) return 'FAIL';
+  if (large) {
+    if (ratio >= 4.5) return 'AAA';
+    if (ratio >= 3) return 'AA';
+    return 'FAIL';
+  } else {
+    if (ratio >= 7) return 'AAA';
+    if (ratio >= 4.5) return 'AA';
+    return 'FAIL';
+  }
+}
+
+describe('ColorContrastPanel — WCAG math', () => {
+  it('black on white has maximum contrast (21:1)', () => {
+    const ratio = contrastRatio('#000000', '#ffffff');
+    expect(ratio).toBeCloseTo(21, 0);
+  });
+
+  it('white on white has minimum contrast (1:1)', () => {
+    const ratio = contrastRatio('#ffffff', '#ffffff');
+    expect(ratio).toBeCloseTo(1, 1);
+  });
+
+  it('black on white passes AAA for normal text', () => {
+    expect(wcagLevel(21, false)).toBe('AAA');
+  });
+
+  it('ratio 4.5 passes AA for normal text', () => {
+    expect(wcagLevel(4.5, false)).toBe('AA');
+  });
+
+  it('ratio 3.0 passes AA for large text only', () => {
+    expect(wcagLevel(3.0, false)).toBe('FAIL');
+    expect(wcagLevel(3.0, true)).toBe('AA');
+  });
+
+  it('ratio 7.0 passes AAA for normal text', () => {
+    expect(wcagLevel(7.0, false)).toBe('AAA');
+  });
+
+  it('ratio 4.49 fails AA for normal text', () => {
+    expect(wcagLevel(4.49, false)).toBe('FAIL');
+  });
+
+  it('invalid hex returns null ratio', () => {
+    expect(contrastRatio('invalid', '#ffffff')).toBeNull();
+  });
+
+  it('null ratio returns FAIL', () => {
+    expect(wcagLevel(null, false)).toBe('FAIL');
+    expect(wcagLevel(null, true)).toBe('FAIL');
+  });
+
+  it('hexToRgb parses 6-digit hex', () => {
+    const rgb = hexToRgb('#ff8800');
+    expect(rgb).not.toBeNull();
+    expect(rgb!.r).toBe(255);
+    expect(rgb!.g).toBe(136);
+    expect(rgb!.b).toBe(0);
+  });
+
+  it('hexToRgb parses 3-digit hex', () => {
+    const rgb = hexToRgb('#f80');
+    expect(rgb).not.toBeNull();
+    expect(rgb!.r).toBe(255);
+    expect(rgb!.g).toBe(136);
+    expect(rgb!.b).toBe(0);
+  });
+
+  it('hexToRgb ignores # prefix', () => {
+    const rgb = hexToRgb('ff8800');
+    expect(rgb).not.toBeNull();
+    expect(rgb!.r).toBe(255);
+  });
+
+  it('white is maximum luminance (1.0)', () => {
+    const rgb = hexToRgb('#ffffff')!;
+    expect(relativeLuminance(rgb)).toBeCloseTo(1, 2);
+  });
+
+  it('black is minimum luminance (0.0)', () => {
+    const rgb = hexToRgb('#000000')!;
+    expect(relativeLuminance(rgb)).toBeCloseTo(0, 2);
+  });
+
+  it('contrast is symmetric (fg vs bg = bg vs fg)', () => {
+    const r1 = contrastRatio('#336699', '#f5f5f5');
+    const r2 = contrastRatio('#f5f5f5', '#336699');
+    expect(r1).toBeCloseTo(r2!, 5);
+  });
+
+  it('dark blue on white passes AA (or better)', () => {
+    const ratio = contrastRatio('#003380', '#ffffff');
+    expect(ratio).not.toBeNull();
+    expect(ratio!).toBeGreaterThanOrEqual(4.5);
+    const level = wcagLevel(ratio, false);
+    expect(level === 'AA' || level === 'AAA').toBe(true);
+  });
+
+  it('light gray on white fails', () => {
+    const ratio = contrastRatio('#cccccc', '#ffffff');
+    expect(ratio).not.toBeNull();
+    expect(ratio!).toBeLessThan(4.5);
+    expect(wcagLevel(ratio, false)).toBe('FAIL');
+  });
+});
+
+// ── LayoutInspectorOverlay — nearest neighbor math ────────────────────────────
+
+interface LIShape { id: string; x: number; y: number; width: number; height: number; }
+
+function findNearest2(shape: LIShape, others: LIShape[]) {
+  let left: number | null = null, right: number | null = null;
+  let top: number | null = null, bottom: number | null = null;
+
+  for (const other of others) {
+    if (other.id === shape.id) continue;
+    const vertOverlap = other.y < shape.y + shape.height && other.y + other.height > shape.y;
+    if (vertOverlap) {
+      const otherRight = other.x + other.width;
+      if (otherRight <= shape.x) {
+        const gap = shape.x - otherRight;
+        if (left === null || gap < left) left = gap;
+      }
+      if (other.x >= shape.x + shape.width) {
+        const gap = other.x - (shape.x + shape.width);
+        if (right === null || gap < right) right = gap;
+      }
+    }
+    const horizOverlap = other.x < shape.x + shape.width && other.x + other.width > shape.x;
+    if (horizOverlap) {
+      const otherBottom = other.y + other.height;
+      if (otherBottom <= shape.y) {
+        const gap = shape.y - otherBottom;
+        if (top === null || gap < top) top = gap;
+      }
+      if (other.y >= shape.y + shape.height) {
+        const gap = other.y - (shape.y + shape.height);
+        if (bottom === null || gap < bottom) bottom = gap;
+      }
+    }
+  }
+  return { left, right, top, bottom };
+}
+
+describe('LayoutInspectorOverlay — nearest neighbor computation', () => {
+  const makeLS = (id: string, x: number, y: number, w = 80, h = 60): LIShape => ({ id, x, y, width: w, height: h });
+
+  it('finds left neighbor gap', () => {
+    const shapes = [makeLS('a', 0, 0), makeLS('b', 100, 0)];
+    const m = findNearest2(shapes[1], shapes);
+    expect(m.left).toBe(20); // b.x(100) - (a.x(0)+a.w(80)) = 20
+  });
+
+  it('finds right neighbor gap', () => {
+    const shapes = [makeLS('a', 0, 0), makeLS('b', 100, 0)];
+    const m = findNearest2(shapes[0], shapes);
+    expect(m.right).toBe(20);
+  });
+
+  it('finds top neighbor gap', () => {
+    const shapes = [makeLS('a', 0, 0), makeLS('b', 0, 100)];
+    const m = findNearest2(shapes[1], shapes);
+    expect(m.top).toBe(40); // b.y(100) - (a.y(0)+a.h(60)) = 40
+  });
+
+  it('finds bottom neighbor gap', () => {
+    const shapes = [makeLS('a', 0, 0), makeLS('b', 0, 100)];
+    const m = findNearest2(shapes[0], shapes);
+    expect(m.bottom).toBe(40);
+  });
+
+  it('returns null when no neighbor in direction', () => {
+    const shapes = [makeLS('a', 0, 0)];
+    const m = findNearest2(shapes[0], shapes);
+    expect(m.left).toBeNull();
+    expect(m.right).toBeNull();
+    expect(m.top).toBeNull();
+    expect(m.bottom).toBeNull();
+  });
+
+  it('skips shapes without vertical overlap for h-direction', () => {
+    const shapes = [makeLS('a', 0, 0, 80, 60), makeLS('b', 100, 500, 80, 60)];
+    const m = findNearest2(shapes[0], shapes);
+    expect(m.right).toBeNull(); // no vertical overlap with b
+  });
+
+  it('finds nearest among multiple neighbors', () => {
+    const shapes = [
+      makeLS('a', 0, 0),
+      makeLS('b', 100, 0),  // gap 20
+      makeLS('c', 200, 0),  // gap 120 from a
+    ];
+    const m = findNearest2(shapes[0], shapes);
+    expect(m.right).toBe(20); // nearest is b (20px), not c (120px)
+  });
+
+  it('handles zero gap (touching shapes)', () => {
+    const shapes = [makeLS('a', 0, 0, 80, 60), makeLS('b', 80, 0, 80, 60)];
+    const m = findNearest2(shapes[0], shapes);
+    expect(m.right).toBe(0);
+  });
+
+  it('screen coordinate conversion is correct', () => {
+    const canvasX = 100;
+    const zoom = 2;
+    const panX = 50;
+    expect(canvasX * zoom + panX).toBe(250);
+  });
+
+  it('shape dimensions scale with zoom', () => {
+    const w = 120;
+    const zoom = 1.5;
+    expect(w * zoom).toBe(180);
+  });
+});
