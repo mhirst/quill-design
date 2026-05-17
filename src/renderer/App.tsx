@@ -670,6 +670,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           if (id) setActiveTool('cursor');
         }}
         onSelectPath={handleLayerSelect}
+        onRenameShape={(id, name) => drawingRef.current.updateShape(id, { name })}
         canvasSelection={canvas.selection}
         pages={pages.pages}
         activePageId={pages.activePageId}

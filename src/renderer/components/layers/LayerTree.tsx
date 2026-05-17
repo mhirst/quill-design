@@ -1,5 +1,5 @@
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { LayerNode } from '../../hooks/useCanvas';
 import type { Shape } from '../../lib/shapes';
 
@@ -109,11 +109,28 @@ interface Props {
   selectedShapeIds?: string[];
   onSelectShape?: (id: string | null) => void;
   onReorderShapes?: (newOrder: Shape[]) => void;
+  onRenameShape?: (id: string, name: string) => void;
 }
 
-export function LayerTree({ layerTree, onSelectPath, shapes, selectedShapeId, selectedShapeIds, onSelectShape }: Props) {
+export function LayerTree({ layerTree, onSelectPath, shapes, selectedShapeId, selectedShapeIds, onSelectShape, onRenameShape }: Props) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameVal, setRenameVal] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const startRename = (shape: Shape) => {
+    setRenamingId(shape.id);
+    setRenameVal(shape.name);
+    setTimeout(() => { renameInputRef.current?.focus(); renameInputRef.current?.select(); }, 0);
+  };
+
+  const commitRename = () => {
+    if (renamingId && renameVal.trim()) {
+      onRenameShape?.(renamingId, renameVal.trim());
+    }
+    setRenamingId(null);
+  };
 
   // ── Drawing shapes mode ────────────────────────────────────────────────────
   if (shapes && shapes.length > 0) {
@@ -124,14 +141,16 @@ export function LayerTree({ layerTree, onSelectPath, shapes, selectedShapeId, se
     const renderShape = (shape: Shape, depth: number) => {
       const isSelected = shape.id === selectedShapeId || (selectedShapeIds?.includes(shape.id) ?? false);
       const isDragOver = shape.id === dragOverId;
+      const isRenaming = renamingId === shape.id;
       const children = shape.isGroup
         ? shape.children.map(id => shapes.find(s => s.id === id)).filter(Boolean) as Shape[]
         : [];
       return (
         <div key={shape.id}>
           <div
-            onClick={() => onSelectShape?.(shape.id)}
-            draggable
+            onClick={() => { if (!isRenaming) onSelectShape?.(shape.id); }}
+            onDoubleClick={(e) => { e.stopPropagation(); startRename(shape); }}
+            draggable={!isRenaming}
             onDragOver={(e) => { e.preventDefault(); setDragOverId(shape.id); }}
             onDragLeave={() => setDragOverId(null)}
             onDrop={(e) => {
@@ -168,15 +187,37 @@ export function LayerTree({ layerTree, onSelectPath, shapes, selectedShapeId, se
                 border: '1px solid rgba(255,255,255,0.12)',
               }} />
             )}
-            <span style={{
-              flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              fontFamily: 'monospace',
-            }}>
-              {shape.name}
-            </span>
-            <span style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}>
-              {Math.round(shape.width)}×{Math.round(shape.height)}
-            </span>
+            {isRenaming ? (
+              <input
+                ref={renameInputRef}
+                value={renameVal}
+                onChange={(e) => setRenameVal(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { commitRename(); e.preventDefault(); }
+                  if (e.key === 'Escape') { setRenamingId(null); e.preventDefault(); }
+                  e.stopPropagation();
+                }}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  flex: 1, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.5)',
+                  borderRadius: 3, color: 'var(--accent)', fontSize: 11,
+                  padding: '1px 4px', outline: 'none', minWidth: 0, fontFamily: 'monospace',
+                }}
+              />
+            ) : (
+              <span style={{
+                flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontFamily: 'monospace',
+              }}>
+                {shape.name}
+              </span>
+            )}
+            {!isRenaming && (
+              <span style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}>
+                {Math.round(shape.width)}×{Math.round(shape.height)}
+              </span>
+            )}
           </div>
           {children.map(child => renderShape(child, depth + 1))}
         </div>

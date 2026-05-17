@@ -23,6 +23,7 @@ interface Props {
   selectedShapeIds: string[];
   onSelectShape: (id: string | null) => void;
   onSelectPath: (path: string) => void;
+  onRenameShape: (id: string, name: string) => void;
   canvasSelection: unknown;
 
   // Pages
@@ -65,6 +66,7 @@ export function LeftPanel({
   selectedShapeIds,
   onSelectShape,
   onSelectPath,
+  onRenameShape,
   canvasSelection,
   pages,
   activePageId,
@@ -204,6 +206,7 @@ export function LeftPanel({
             selectedShapeId={selectedShapeId}
             selectedShapeIds={selectedShapeIds}
             onSelectShape={onSelectShape}
+            onRenameShape={onRenameShape}
           />
         )}
 
