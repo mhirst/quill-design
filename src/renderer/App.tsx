@@ -116,6 +116,7 @@ import { DesignDiffPanel } from './components/canvas/DesignDiffPanel';
 import { ShapeVariationsPanel, type ShapePatch as VariationPatch } from './components/canvas/ShapeVariationsPanel';
 import { GlobalSearchPanel } from './components/canvas/GlobalSearchPanel';
 import { ColorVisionOverlay } from './components/canvas/ColorVisionOverlay';
+import { PathInspectorPanel } from './components/canvas/PathInspectorPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -501,6 +502,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showShapeVariations, setShowShapeVariations] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showColorVision, setShowColorVision] = useState(false);
+  const [showPathInspector, setShowPathInspector] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -900,11 +902,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowColorScheme(o => !o); return; }
             break;
           }
-          // ── p — Theme customizer / Presence / Prototype ──────────────────
-          // ⌘⇧⌥P = Prototype, ⌘⇧P = Cursor Presence, ⌘P = Theme Customizer
+          // ── p — Theme customizer / Presence / Prototype / Path Inspector ──
+          // ⌘⇧⌥P = Prototype, ⌘⇧P = Cursor Presence, ⌘⌥P = Path Inspector, ⌘P = Theme Customizer
           case 'p': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPrototype(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowPresencePanel(p => !p); setShowCursorPresence(p => !p); showToast(showCursorPresence ? 'Presence off' : 'Presence mode on', 'info'); return; }
+            if (e.altKey) { e.preventDefault(); setShowPathInspector(v => !v); return; }
             e.preventDefault(); setShowThemeCustomizer(o => !o); return;
           }
           // ── q — Clip path editor ──────────────────────────────────────────
@@ -2684,6 +2687,16 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showColorVision}
         canvasWidth={canvasSize.width}
         canvasHeight={canvasSize.height}
+      />
+
+      {/* Path Inspector Panel (⌘⌥P) */}
+      <PathInspectorPanel
+        open={showPathInspector}
+        onClose={() => setShowPathInspector(false)}
+        selectedShape={selectedShape}
+        onPatchShape={(patch) => {
+          if (selectedShape) drawingRef.current.updateShape(selectedShape.id, patch);
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}

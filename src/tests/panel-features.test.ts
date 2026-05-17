@@ -1511,3 +1511,204 @@ describe('ShapeVariationsPanel generation', () => {
     });
   });
 });
+
+// ── PathInspectorPanel utilities ──────────────────────────────────────────────
+
+// Inline BezierPoint type for test isolation
+interface TestBezierPoint {
+  x: number; y: number;
+  cp1x?: number; cp1y?: number;
+  cp2x?: number; cp2y?: number;
+}
+
+function fmtNum(n: number): string {
+  return Number(n.toFixed(3)).toString();
+}
+
+function pointsToPathDTest(points: TestBezierPoint[], closed: boolean): string {
+  if (!points.length) return '';
+  const parts: string[] = [];
+  const p0 = points[0];
+  parts.push(`M ${fmtNum(p0.x)} ${fmtNum(p0.y)}`);
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const hasCp1 = prev.cp2x !== undefined && prev.cp2y !== undefined;
+    const hasCp2 = curr.cp1x !== undefined && curr.cp1y !== undefined;
+    if (hasCp1 && hasCp2) {
+      parts.push(`C ${fmtNum(prev.cp2x!)} ${fmtNum(prev.cp2y!)} ${fmtNum(curr.cp1x!)} ${fmtNum(curr.cp1y!)} ${fmtNum(curr.x)} ${fmtNum(curr.y)}`);
+    } else if (hasCp1) {
+      parts.push(`Q ${fmtNum(prev.cp2x!)} ${fmtNum(prev.cp2y!)} ${fmtNum(curr.x)} ${fmtNum(curr.y)}`);
+    } else if (hasCp2) {
+      parts.push(`Q ${fmtNum(curr.cp1x!)} ${fmtNum(curr.cp1y!)} ${fmtNum(curr.x)} ${fmtNum(curr.y)}`);
+    } else {
+      parts.push(`L ${fmtNum(curr.x)} ${fmtNum(curr.y)}`);
+    }
+  }
+  if (closed && points.length > 1) parts.push('Z');
+  return parts.join(' ');
+}
+
+function reversePathTest(points: TestBezierPoint[]): TestBezierPoint[] {
+  return [...points].reverse().map(pt => ({
+    x: pt.x, y: pt.y,
+    cp1x: pt.cp2x, cp1y: pt.cp2y,
+    cp2x: pt.cp1x, cp2y: pt.cp1y,
+  }));
+}
+
+function simplifyPathTest(points: TestBezierPoint[]): TestBezierPoint[] {
+  return points.map((pt, i) => {
+    const prev = points[i - 1];
+    const next = points[i + 1];
+    const newPt: TestBezierPoint = { x: pt.x, y: pt.y };
+    if (pt.cp1x !== undefined && prev) {
+      const midX = (prev.x + pt.x) / 2;
+      const midY = (prev.y + pt.y) / 2;
+      const dist = Math.hypot(pt.cp1x - midX, (pt.cp1y ?? 0) - midY);
+      if (dist > 1) { newPt.cp1x = pt.cp1x; newPt.cp1y = pt.cp1y; }
+    }
+    if (pt.cp2x !== undefined && next) {
+      const midX = (pt.x + next.x) / 2;
+      const midY = (pt.y + next.y) / 2;
+      const dist = Math.hypot(pt.cp2x - midX, (pt.cp2y ?? 0) - midY);
+      if (dist > 1) { newPt.cp2x = pt.cp2x; newPt.cp2y = pt.cp2y; }
+    }
+    return newPt;
+  });
+}
+
+function parseSVGPathDTest(d: string): { points: TestBezierPoint[]; closed: boolean } {
+  const tokens = d.trim().split(/[\s,]+|(?=[MLCQZmlcqz])/g).filter(Boolean);
+  const points: TestBezierPoint[] = [];
+  let closed = false;
+  let i = 0;
+  let lastX = 0; let lastY = 0;
+  const num = () => parseFloat(tokens[i++]);
+  while (i < tokens.length) {
+    const cmd = tokens[i++];
+    switch (cmd) {
+      case 'M': case 'm': {
+        const x = cmd === 'M' ? num() : lastX + num();
+        const y = cmd === 'M' ? num() : lastY + num();
+        points.push({ x, y }); lastX = x; lastY = y; break;
+      }
+      case 'L': case 'l': {
+        while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
+          const x = cmd === 'L' ? num() : lastX + num();
+          const y = cmd === 'L' ? num() : lastY + num();
+          points.push({ x, y }); lastX = x; lastY = y;
+        }
+        break;
+      }
+      case 'C': case 'c': {
+        while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
+          const cp2x = num(); const cp2y = num();
+          const cp1x = num(); const cp1y = num();
+          const x = num(); const y = num();
+          if (points.length > 0) { const prev = points[points.length - 1]; prev.cp2x = cp2x; prev.cp2y = cp2y; }
+          points.push({ x, y, cp1x, cp1y }); lastX = x; lastY = y;
+        }
+        break;
+      }
+      case 'Z': case 'z': closed = true; break;
+      default: break;
+    }
+  }
+  return { points, closed };
+}
+
+describe('PathInspectorPanel utilities', () => {
+  it('pointsToPathD generates correct M L commands for straight path', () => {
+    const pts: TestBezierPoint[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }];
+    const d = pointsToPathDTest(pts, false);
+    expect(d).toBe('M 0 0 L 100 0 L 100 100');
+  });
+
+  it('pointsToPathD adds Z for closed path', () => {
+    const pts: TestBezierPoint[] = [{ x: 0, y: 0 }, { x: 50, y: 100 }];
+    const d = pointsToPathDTest(pts, true);
+    expect(d).toContain('Z');
+  });
+
+  it('pointsToPathD generates C command when both control points are present', () => {
+    const pts: TestBezierPoint[] = [
+      { x: 0, y: 0, cp2x: 10, cp2y: 0 },
+      { x: 100, y: 0, cp1x: 90, cp1y: 0 },
+    ];
+    const d = pointsToPathDTest(pts, false);
+    expect(d).toContain('C');
+    expect(d).not.toContain('L');
+  });
+
+  it('pointsToPathD generates Q command when only out-handle present', () => {
+    const pts: TestBezierPoint[] = [
+      { x: 0, y: 0, cp2x: 50, cp2y: -50 },
+      { x: 100, y: 0 },
+    ];
+    const d = pointsToPathDTest(pts, false);
+    expect(d).toContain('Q');
+  });
+
+  it('pointsToPathD returns empty string for empty array', () => {
+    expect(pointsToPathDTest([], false)).toBe('');
+  });
+
+  it('reversePathTest reverses point order', () => {
+    const pts: TestBezierPoint[] = [{ x: 0, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 0 }];
+    const reversed = reversePathTest(pts);
+    expect(reversed[0].x).toBe(100);
+    expect(reversed[0].y).toBe(0);
+    expect(reversed[2].x).toBe(0);
+    expect(reversed[2].y).toBe(0);
+  });
+
+  it('reversePathTest swaps control point handles', () => {
+    const pts: TestBezierPoint[] = [
+      { x: 0, y: 0, cp2x: 10, cp2y: 5 },
+      { x: 100, y: 0, cp1x: 90, cp1y: 5 },
+    ];
+    const reversed = reversePathTest(pts);
+    // Original last point had cp1x=90, which becomes cp2x in reversed
+    expect(reversed[0].cp2x).toBe(90);
+    expect(reversed[0].cp2y).toBe(5);
+  });
+
+  it('simplifyPathTest removes near-midpoint control points', () => {
+    const pts: TestBezierPoint[] = [
+      { x: 0, y: 0 },
+      // cp1 is exactly midpoint between prev(0,0) and curr(100,0) = (50,0) — deviation 0
+      { x: 100, y: 0, cp1x: 50, cp1y: 0 },
+      { x: 200, y: 0 },
+    ];
+    const simplified = simplifyPathTest(pts);
+    // The cp1 at exact midpoint should be removed (dist <= 1)
+    expect(simplified[1].cp1x).toBeUndefined();
+  });
+
+  it('simplifyPathTest keeps control points with significant deviation', () => {
+    const pts: TestBezierPoint[] = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0, cp1x: 50, cp1y: -50 }, // 50px above midpoint — significant
+      { x: 200, y: 0 },
+    ];
+    const simplified = simplifyPathTest(pts);
+    expect(simplified[1].cp1x).toBe(50);
+    expect(simplified[1].cp1y).toBe(-50);
+  });
+
+  it('parseSVGPathDTest parses M L Z path correctly', () => {
+    const { points, closed } = parseSVGPathDTest('M 10 20 L 50 80 L 90 20 Z');
+    expect(points).toHaveLength(3);
+    expect(points[0]).toMatchObject({ x: 10, y: 20 });
+    expect(points[1]).toMatchObject({ x: 50, y: 80 });
+    expect(points[2]).toMatchObject({ x: 90, y: 20 });
+    expect(closed).toBe(true);
+  });
+
+  it('parseSVGPathDTest parses open path without Z', () => {
+    const { points, closed } = parseSVGPathDTest('M 0 0 L 100 0 L 100 100');
+    expect(points).toHaveLength(3);
+    expect(closed).toBe(false);
+  });
+});
