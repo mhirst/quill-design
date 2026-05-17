@@ -113,6 +113,7 @@ import { PerspectiveGridOverlay } from './components/canvas/PerspectiveGridOverl
 import { CSSSnippetPanel } from './components/canvas/CSSSnippetPanel';
 import { SpacingHeatmapOverlay } from './components/canvas/SpacingHeatmapOverlay';
 import { DesignDiffPanel } from './components/canvas/DesignDiffPanel';
+import { ShapeVariationsPanel, type ShapePatch as VariationPatch } from './components/canvas/ShapeVariationsPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -495,6 +496,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showCSSSnippet, setShowCSSSnippet] = useState(false);
   const [showSpacingHeatmap, setShowSpacingHeatmap] = useState(false);
   const [showDesignDiff, setShowDesignDiff] = useState(false);
+  const [showShapeVariations, setShowShapeVariations] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1003,6 +1005,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── z — Undo / Redo ───────────────────────────────────────────────
           case 'z': {
             e.preventDefault();
+            if (e.altKey && !e.shiftKey) { setShowShapeVariations(v => !v); return; }
             if (e.shiftKey) { drawingRef.current.redo(); showToast('Redo', 'action'); }
             else { drawingRef.current.undo(); showToast('Undo', 'action'); }
             return;
@@ -2613,6 +2616,34 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showDesignDiff}
         onClose={() => setShowDesignDiff(false)}
         shapes={drawing.state.shapes}
+      />
+
+      {/* Shape Variations Panel (⌘⌥Z) */}
+      <ShapeVariationsPanel
+        open={showShapeVariations}
+        onClose={() => setShowShapeVariations(false)}
+        selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+        onCommit={(patches: VariationPatch[]) => {
+          const sourceId = drawing.state.selectedId;
+          const source = sourceId ? drawing.state.shapes.find(s => s.id === sourceId) : null;
+          if (!source) return;
+          for (const patch of patches) {
+            const newShape = defaultShape(source.type, uuid());
+            drawing.addShape({
+              ...source, ...newShape, id: newShape.id,
+              x: patch.x, y: patch.y,
+              width: patch.width ?? source.width,
+              height: patch.height ?? source.height,
+              fill: patch.fill ?? source.fill,
+              opacity: patch.opacity ?? source.opacity,
+              borderRadius: patch.borderRadius ?? source.borderRadius,
+              rotation: patch.rotation ?? source.rotation,
+              strokeWidth: patch.strokeWidth ?? source.strokeWidth,
+              name: source.name ? `${source.name} var` : `${source.type} var`,
+            });
+          }
+          showToast(`Placed ${patches.length} variations`, 'action');
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
