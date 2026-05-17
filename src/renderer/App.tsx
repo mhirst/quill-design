@@ -130,6 +130,7 @@ import { ShapeMorphPanel } from './components/canvas/ShapeMorphPanel';
 import { BreakpointSimulatorPanel } from './components/canvas/BreakpointSimulatorPanel';
 import { ComponentAnalyzerPanel } from './components/canvas/ComponentAnalyzerPanel';
 import { AnnotationOverlayPanel } from './components/canvas/AnnotationOverlayPanel';
+import { ZIndexVisualizerPanel } from './components/canvas/ZIndexVisualizerPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -529,6 +530,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showBreakpointSim, setShowBreakpointSim] = useState(false);
   const [showComponentAnalyzer, setShowComponentAnalyzer] = useState(false);
   const [showAnnotationOverlay, setShowAnnotationOverlay] = useState(false);
+  const [showZIndexVisualizer, setShowZIndexVisualizer] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1051,6 +1053,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── z — Undo / Redo ───────────────────────────────────────────────
           case 'z': {
             e.preventDefault();
+            if (e.altKey && e.shiftKey) { setShowZIndexVisualizer(v => !v); return; }
             if (e.altKey && !e.shiftKey) { setShowShapeVariations(v => !v); return; }
             if (e.shiftKey) { drawingRef.current.redo(); showToast('Redo', 'action'); }
             else { drawingRef.current.undo(); showToast('Undo', 'action'); }
@@ -2925,6 +2928,29 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onClose={() => setShowAnnotationOverlay(false)}
         canvasWidth={1440}
         canvasHeight={900}
+      />
+
+      {/* Z-Index Visualizer Panel (⌘⌥⇧Z) */}
+      <ZIndexVisualizerPanel
+        open={showZIndexVisualizer}
+        onClose={() => setShowZIndexVisualizer(false)}
+        shapes={drawing.state.shapes}
+        selectedShapeId={drawing.state.selectedId ?? null}
+        onSelectShape={(id) => { drawingRef.current.select(id); }}
+        onMoveLayer={(id, dir) => {
+          drawingRef.current.select(id);
+          const ss = drawing.state.shapes;
+          const idx = ss.findIndex(s => s.id === id);
+          if (dir === 'up' && idx < ss.length - 1) {
+            const arr = [...ss];
+            [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+            drawingRef.current.reorderShapes(arr);
+          } else if (dir === 'down' && idx > 0) {
+            const arr = [...ss];
+            [arr[idx], arr[idx - 1]] = [arr[idx - 1], arr[idx]];
+            drawingRef.current.reorderShapes(arr);
+          }
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}

@@ -2780,3 +2780,100 @@ describe('AnnotationOverlayPanel geometry utilities', () => {
     expect(d.startsWith('M')).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ZIndexVisualizerPanel — inlined utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+function toIsoTest(x: number, y: number, z: number, tiltDeg: number, scale: number): { sx: number; sy: number } {
+  const tilt = (tiltDeg * Math.PI) / 180;
+  const sx = (x - y) * Math.cos(tilt) * scale;
+  const sy = (x + y) * Math.sin(tilt) * scale - z * scale;
+  return { sx, sy };
+}
+
+function typeColorTest(type: string): string {
+  const map: Record<string, string> = {
+    rect: '#3b82f6', ellipse: '#22c55e', text: '#f59e0b',
+    frame: '#8b5cf6', line: '#ec4899', arrow: '#ef4444',
+  };
+  return map[type] ?? '#888888';
+}
+
+interface BoundsTestLayer { x: number; y: number; width: number; height: number; }
+function layersBoundsTest(layers: BoundsTestLayer[]): { minX: number; minY: number; maxX: number; maxY: number } {
+  if (layers.length === 0) return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
+  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+  for (const l of layers) {
+    minX = Math.min(minX, l.x);
+    minY = Math.min(minY, l.y);
+    maxX = Math.max(maxX, l.x + l.width);
+    maxY = Math.max(maxY, l.y + l.height);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+describe('ZIndexVisualizerPanel utilities', () => {
+  // toIso
+  it('toIso: origin (0,0,0) → (0,0)', () => {
+    const { sx, sy } = toIsoTest(0, 0, 0, 30, 1);
+    expect(sx).toBeCloseTo(0, 5);
+    expect(sy).toBeCloseTo(0, 5);
+  });
+
+  it('toIso: increasing z raises point (sy decreases)', () => {
+    const low = toIsoTest(50, 50, 0, 30, 1);
+    const high = toIsoTest(50, 50, 100, 30, 1);
+    expect(high.sy).toBeLessThan(low.sy);
+  });
+
+  it('toIso: symmetric x=y → sx=0', () => {
+    const { sx } = toIsoTest(100, 100, 0, 30, 1);
+    expect(sx).toBeCloseTo(0, 5);
+  });
+
+  it('toIso: scale multiplies output proportionally', () => {
+    const s1 = toIsoTest(100, 0, 0, 30, 1);
+    const s2 = toIsoTest(100, 0, 0, 30, 2);
+    expect(s2.sx).toBeCloseTo(s1.sx * 2, 5);
+  });
+
+  // typeColor
+  it('typeColor: rect → blue', () => {
+    expect(typeColorTest('rect')).toBe('#3b82f6');
+  });
+
+  it('typeColor: ellipse → green', () => {
+    expect(typeColorTest('ellipse')).toBe('#22c55e');
+  });
+
+  it('typeColor: unknown type → gray', () => {
+    expect(typeColorTest('hexagon')).toBe('#888888');
+  });
+
+  // layersBounds
+  it('layersBounds: empty → default 0-100 box', () => {
+    const b = layersBoundsTest([]);
+    expect(b.minX).toBe(0);
+    expect(b.maxX).toBe(100);
+  });
+
+  it('layersBounds: single layer', () => {
+    const b = layersBoundsTest([{ x: 10, y: 20, width: 100, height: 50 }]);
+    expect(b.minX).toBe(10);
+    expect(b.minY).toBe(20);
+    expect(b.maxX).toBe(110);
+    expect(b.maxY).toBe(70);
+  });
+
+  it('layersBounds: multiple layers encapsulated', () => {
+    const layers = [
+      { x: 0, y: 0, width: 100, height: 100 },
+      { x: 200, y: 300, width: 50, height: 50 },
+    ];
+    const b = layersBoundsTest(layers);
+    expect(b.minX).toBe(0);
+    expect(b.maxX).toBe(250);
+    expect(b.maxY).toBe(350);
+  });
+});
