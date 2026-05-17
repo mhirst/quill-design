@@ -122,6 +122,7 @@ import { EasingCurvePanel } from './components/canvas/EasingCurvePanel';
 import { IconExportPanel } from './components/canvas/IconExportPanel';
 import { ContrastMatrixPanel } from './components/canvas/ContrastMatrixPanel';
 import { LayerStackPanel } from './components/canvas/LayerStackPanel';
+import { HandoffSpecPanel } from './components/canvas/HandoffSpecPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -513,6 +514,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showIconExport, setShowIconExport] = useState(false);
   const [showContrastMatrix, setShowContrastMatrix] = useState(false);
   const [showLayerStack, setShowLayerStack] = useState(false);
+  const [showHandoffSpec, setShowHandoffSpec] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1050,6 +1052,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShow3DTransform(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowLayoutInspector(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowLayerStack(v => !v); return; }
+            break;
+          }
+          // ── 4 — Handoff Spec ──────────────────────────────────────────────
+          case '4': {
+            if (e.altKey) { e.preventDefault(); setShowHandoffSpec(v => !v); return; }
             break;
           }
           // ── ] [ — Z-order ─────────────────────────────────────────────────
@@ -2786,6 +2793,14 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             }
           }
         }}
+      />
+
+      {/* Handoff Spec Generator (⌘⌥4) */}
+      <HandoffSpecPanel
+        open={showHandoffSpec}
+        onClose={() => setShowHandoffSpec(false)}
+        shapes={drawing.state.shapes}
+        designName={(fileManager.filePath ?? activeFilePath ?? '').split(/[\\/]/).pop()?.replace(/\.pen$/, '') || 'Design'}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
