@@ -1403,3 +1403,111 @@ describe('DesignDiffPanel diff engine', () => {
     expect(diff.some(d => d.type === 'restyled' && d.changes.includes('Opacity'))).toBe(true);
   });
 });
+
+// ── ShapeVariationsPanel generation tests ─────────────────────────────────────
+
+// Inline seeded RNG (mulberry32) + HSL conversion
+function mulberry32Test(seed: number) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function randBetweenTest(rng: () => number, min: number, max: number): number {
+  return min + rng() * (max - min);
+}
+
+interface VarShape { id: string; type: string; x: number; y: number; width: number; height: number; fill?: string; opacity?: number; borderRadius?: number; rotation?: number; strokeWidth?: number; }
+interface VarAxis { key: string; enabled: boolean; min: number; max: number; }
+interface VarConfig { count: number; seed: number; lockAspect: boolean; layout: 'grid'|'row'|'radial'; gridCols: number; gap: number; axes: VarAxis[]; }
+interface VarResult { index: number; fill: string; opacity: number; width: number; height: number; x: number; y: number; borderRadius: number; rotation: number; strokeWidth: number; }
+
+function generateVariantsTest(shape: VarShape, config: VarConfig): VarResult[] {
+  const rng = mulberry32Test(config.seed);
+  const axisMap = new Map(config.axes.map(a => [a.key, a]));
+  const baseOpacity = shape.opacity ?? 1;
+  const baseWidth = shape.width, baseHeight = shape.height;
+  const results: VarResult[] = [];
+  for (let i = 0; i < config.count; i++) {
+    let opacity = baseOpacity;
+    const opacityAxis = axisMap.get('opacity');
+    if (opacityAxis?.enabled) opacity = Math.max(0.05, Math.min(1, opacity + randBetweenTest(rng, opacityAxis.min, opacityAxis.max) / 100));
+    let width = baseWidth, height = baseHeight;
+    const sizeAxis = axisMap.get('size');
+    if (sizeAxis?.enabled) {
+      const scalePct = 1 + randBetweenTest(rng, sizeAxis.min, sizeAxis.max) / 100;
+      width = Math.max(4, Math.round(baseWidth * scalePct));
+      if (config.lockAspect) height = Math.max(4, Math.round(baseHeight * scalePct));
+      else { const sh = 1 + randBetweenTest(rng, sizeAxis.min, sizeAxis.max) / 100; height = Math.max(4, Math.round(baseHeight * sh)); }
+    }
+    results.push({ index: i, fill: shape.fill ?? '#fff', opacity, width, height, x: 0, y: 0, borderRadius: 0, rotation: 0, strokeWidth: 0 });
+  }
+  // Apply row layout
+  if (config.layout === 'row') {
+    let cx = shape.x + shape.width + config.gap;
+    for (const v of results) { v.x = cx; v.y = shape.y; cx += v.width + config.gap; }
+  }
+  return results;
+}
+
+describe('ShapeVariationsPanel generation', () => {
+  const shape: VarShape = { id: 'a', type: 'rectangle', x: 100, y: 100, width: 80, height: 50, fill: '#6366f1', opacity: 1 };
+  const noAxes: VarAxis[] = [
+    { key: 'opacity', enabled: false, min: -20, max: 0 },
+    { key: 'size', enabled: false, min: -20, max: 20 },
+  ];
+
+  it('generates correct count of variants', () => {
+    const cfg: VarConfig = { count: 6, seed: 42, lockAspect: true, layout: 'row', gridCols: 3, gap: 16, axes: noAxes };
+    expect(generateVariantsTest(shape, cfg).length).toBe(6);
+  });
+
+  it('same seed produces same results', () => {
+    const cfg: VarConfig = { count: 4, seed: 12345, lockAspect: true, layout: 'row', gridCols: 3, gap: 16, axes: [{ key: 'opacity', enabled: true, min: -30, max: 0 }, { key: 'size', enabled: false, min: -20, max: 20 }] };
+    const a = generateVariantsTest(shape, cfg);
+    const b = generateVariantsTest(shape, cfg);
+    expect(a.map(v => v.opacity)).toEqual(b.map(v => v.opacity));
+  });
+
+  it('different seeds produce different results', () => {
+    const axes: VarAxis[] = [{ key: 'opacity', enabled: true, min: -40, max: 0 }, { key: 'size', enabled: false, min: -20, max: 20 }];
+    const cfg1: VarConfig = { count: 4, seed: 1, lockAspect: true, layout: 'row', gridCols: 3, gap: 16, axes };
+    const cfg2: VarConfig = { ...cfg1, seed: 2 };
+    const a = generateVariantsTest(shape, cfg1);
+    const b = generateVariantsTest(shape, cfg2);
+    expect(a.some((v, i) => v.opacity !== b[i].opacity)).toBe(true);
+  });
+
+  it('opacity axis clamps to minimum 0.05', () => {
+    const axes: VarAxis[] = [{ key: 'opacity', enabled: true, min: -100, max: -99 }, { key: 'size', enabled: false, min: -20, max: 20 }];
+    const cfg: VarConfig = { count: 10, seed: 1, lockAspect: true, layout: 'row', gridCols: 3, gap: 16, axes };
+    const results = generateVariantsTest(shape, cfg);
+    expect(results.every(v => v.opacity >= 0.05)).toBe(true);
+  });
+
+  it('row layout starts variants after source shape + gap', () => {
+    const cfg: VarConfig = { count: 3, seed: 1, lockAspect: true, layout: 'row', gridCols: 3, gap: 20, axes: noAxes };
+    const results = generateVariantsTest(shape, cfg);
+    expect(results[0].x).toBe(shape.x + shape.width + 20);
+  });
+
+  it('size axis disabled keeps original width', () => {
+    const cfg: VarConfig = { count: 5, seed: 7, lockAspect: true, layout: 'row', gridCols: 3, gap: 8, axes: noAxes };
+    const results = generateVariantsTest(shape, cfg);
+    expect(results.every(v => v.width === shape.width)).toBe(true);
+  });
+
+  it('size axis with lockAspect maintains original aspect ratio', () => {
+    const axes: VarAxis[] = [{ key: 'size', enabled: true, min: -20, max: 20 }, { key: 'opacity', enabled: false, min: -20, max: 0 }];
+    const cfg: VarConfig = { count: 6, seed: 99, lockAspect: true, layout: 'row', gridCols: 3, gap: 8, axes };
+    const results = generateVariantsTest(shape, cfg);
+    const origRatio = shape.width / shape.height;
+    results.forEach(v => {
+      const ratio = v.width / v.height;
+      expect(Math.abs(ratio - origRatio)).toBeLessThan(0.05);
+    });
+  });
+});
