@@ -107,6 +107,7 @@ import { MoodboardPanel, type MoodTheme } from './components/canvas/MoodboardPan
 import { TypographySpecimenPanel } from './components/canvas/TypographySpecimenPanel';
 import { BreakpointRulerOverlay } from './components/canvas/BreakpointRulerOverlay';
 import { MicroInteractionPanel } from './components/canvas/MicroInteractionPanel';
+import { GridDuplicatorPanel, type ShapePatch } from './components/canvas/GridDuplicatorPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -483,6 +484,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showTypographySpecimen, setShowTypographySpecimen] = useState(false);
   const [showBreakpointRuler, setShowBreakpointRuler] = useState(false);
   const [showMicroInteraction, setShowMicroInteraction] = useState(false);
+  const [showGridDuplicator, setShowGridDuplicator] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -791,10 +793,10 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (copyCount > 0) showToast(copyCount === 1 ? `Copied "${shapes.find(s => s.id === selectedId)?.name ?? 'shape'}"` : `Copied ${copyCount} shapes`, 'action');
             return;
           }
-          // ── d — Duplicate / Design system / Design tokens / Redlines ───────
+          // ── d — Duplicate / Grid Duplicator / Design system / Tokens ────────
           case 'd': {
             e.preventDefault();
-            if (e.shiftKey && e.altKey) { setShowDesignTokens(t => !t); return; }
+            if (e.shiftKey && e.altKey) { setShowGridDuplicator(v => !v); return; }
             if (e.shiftKey) { setShowDesignSystem(o => !o); return; }
             if (e.altKey) { setShowRedlines(v => !v); return; }
             const { selectedIds: dIds, selectedId: dId, shapes: dShapes } = drawingRef.current.state;
@@ -2516,6 +2518,32 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showMicroInteraction}
         onClose={() => setShowMicroInteraction(false)}
         selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+      />
+
+      {/* Grid Duplicator Panel (⌘⇧⌥D) */}
+      <GridDuplicatorPanel
+        open={showGridDuplicator}
+        onClose={() => setShowGridDuplicator(false)}
+        selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+        onDuplicate={(patches: ShapePatch[]) => {
+          const sourceId = drawing.state.selectedId;
+          const source = sourceId ? drawing.state.shapes.find(s => s.id === sourceId) : null;
+          if (!source) return;
+          for (const patch of patches) {
+            const newShape = defaultShape(source.type, uuid());
+            drawing.addShape({
+              ...source,
+              ...newShape,
+              id: newShape.id,
+              x: patch.x,
+              y: patch.y,
+              rotation: patch.rotation ?? source.rotation,
+              opacity: patch.opacity ?? source.opacity,
+              name: source.name ? `${source.name} copy` : `${source.type} copy`,
+            });
+          }
+          showToast(`Created ${patches.length} copies`, 'action');
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
