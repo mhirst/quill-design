@@ -140,6 +140,7 @@ import { SnapGuideManagerPanel } from './components/canvas/SnapGuideManagerPanel
 import { DesignSystemHealthPanel } from './components/canvas/DesignSystemHealthPanel';
 import { ShapeTimelinePanel } from './components/canvas/ShapeTimelinePanel';
 import { SVGPatternLibrary } from './components/canvas/SVGPatternLibrary';
+import { SpacingTokenInspector } from './components/canvas/SpacingTokenInspector';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -549,6 +550,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showDesignSystemHealth, setShowDesignSystemHealth] = useState(false);
   const [showShapeTimeline, setShowShapeTimeline] = useState(false);
   const [showSVGPatterns, setShowSVGPatterns] = useState(false);
+  const [showSpacingTokens, setShowSpacingTokens] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1101,8 +1103,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowLayerStack(v => !v); return; }
             break;
           }
-          // ── 4 — Handoff Spec ──────────────────────────────────────────────
+          // ── 4 — Handoff Spec / Spacing Tokens ────────────────────────────
           case '4': {
+            if (e.shiftKey) { e.preventDefault(); setShowSpacingTokens(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowHandoffSpec(v => !v); return; }
             break;
           }
@@ -3070,6 +3073,16 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             drawingRef.current.updateShape(id, patch);
             showToast('Pattern applied', 'action');
           }
+        }}
+      />
+
+      {/* Spacing Token Inspector (⌘⇧4) */}
+      <SpacingTokenInspector
+        open={showSpacingTokens}
+        onClose={() => setShowSpacingTokens(false)}
+        shapes={drawing.state.shapes}
+        onSelectShapes={(ids) => {
+          if (ids.length > 0) drawingRef.current.select(ids[0]);
         }}
       />
 

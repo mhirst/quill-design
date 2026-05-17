@@ -4294,3 +4294,142 @@ describe('SVGPatternLibrary utilities', () => {
     }
   });
 });
+
+// ── SpacingTokenInspector ──────────────────────────────────────────────────────
+
+// Inlined utilities from SpacingTokenInspector.tsx
+
+interface STShape { id: string; type: string; x: number; y: number; width: number; height: number; name?: string; }
+
+function stBounds(s: STShape) { return { left: s.x, right: s.x + s.width, top: s.y, bottom: s.y + s.height }; }
+
+function stHorizontalGap(a: STShape, b: STShape): number | null {
+  const ba = stBounds(a); const bb = stBounds(b);
+  if (bb.left < ba.right) return null;
+  const overlapTop = Math.max(ba.top, bb.top);
+  const overlapBottom = Math.min(ba.bottom, bb.bottom);
+  if (overlapBottom <= overlapTop) return null;
+  return Math.round(bb.left - ba.right);
+}
+
+function stVerticalGap(a: STShape, b: STShape): number | null {
+  const ba = stBounds(a); const bb = stBounds(b);
+  if (bb.top < ba.bottom) return null;
+  const overlapLeft = Math.max(ba.left, bb.left);
+  const overlapRight = Math.min(ba.right, bb.right);
+  if (overlapRight <= overlapLeft) return null;
+  return Math.round(bb.top - ba.bottom);
+}
+
+function stNearestScale(value: number, scale: number[]): number {
+  if (scale.length === 0) return value;
+  return scale.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
+}
+
+function stIsOnScale(value: number, scale: number[]): boolean {
+  return scale.some(s => Math.abs(s - value) <= 0.5);
+}
+
+function stGapStats(gaps: { value: number }[]) {
+  if (gaps.length === 0) return { count: 0, uniqueValues: 0, minGap: 0, maxGap: 0, avgGap: 0 };
+  const values = gaps.map(g => g.value);
+  return {
+    count: gaps.length,
+    uniqueValues: new Set(values.map(v => Math.round(v))).size,
+    minGap: Math.min(...values),
+    maxGap: Math.max(...values),
+    avgGap: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+  };
+}
+
+describe('SpacingTokenInspector utilities', () => {
+  // horizontalGap
+  it('horizontalGap: measures gap between adjacent shapes', () => {
+    const a: STShape = { id: 'a', type: 'rect', x: 0, y: 0, width: 100, height: 50 };
+    const b: STShape = { id: 'b', type: 'rect', x: 116, y: 0, width: 50, height: 50 };
+    expect(stHorizontalGap(a, b)).toBe(16);
+  });
+
+  it('horizontalGap: null when shapes do not overlap vertically', () => {
+    const a: STShape = { id: 'a', type: 'rect', x: 0, y: 0, width: 100, height: 50 };
+    const b: STShape = { id: 'b', type: 'rect', x: 120, y: 100, width: 50, height: 50 };
+    expect(stHorizontalGap(a, b)).toBeNull();
+  });
+
+  it('horizontalGap: null when b is to the left of a', () => {
+    const a: STShape = { id: 'a', type: 'rect', x: 100, y: 0, width: 100, height: 50 };
+    const b: STShape = { id: 'b', type: 'rect', x: 0, y: 0, width: 50, height: 50 };
+    expect(stHorizontalGap(a, b)).toBeNull();
+  });
+
+  it('horizontalGap: zero gap for touching shapes', () => {
+    const a: STShape = { id: 'a', type: 'rect', x: 0, y: 0, width: 100, height: 50 };
+    const b: STShape = { id: 'b', type: 'rect', x: 100, y: 0, width: 50, height: 50 };
+    expect(stHorizontalGap(a, b)).toBe(0);
+  });
+
+  // verticalGap
+  it('verticalGap: measures gap between stacked shapes', () => {
+    const a: STShape = { id: 'a', type: 'rect', x: 0, y: 0, width: 100, height: 50 };
+    const b: STShape = { id: 'b', type: 'rect', x: 0, y: 66, width: 100, height: 50 };
+    expect(stVerticalGap(a, b)).toBe(16);
+  });
+
+  it('verticalGap: null when shapes do not overlap horizontally', () => {
+    const a: STShape = { id: 'a', type: 'rect', x: 0, y: 0, width: 50, height: 50 };
+    const b: STShape = { id: 'b', type: 'rect', x: 100, y: 70, width: 50, height: 50 };
+    expect(stVerticalGap(a, b)).toBeNull();
+  });
+
+  it('verticalGap: null when b is above a', () => {
+    const a: STShape = { id: 'a', type: 'rect', x: 0, y: 100, width: 100, height: 50 };
+    const b: STShape = { id: 'b', type: 'rect', x: 0, y: 0, width: 100, height: 50 };
+    expect(stVerticalGap(a, b)).toBeNull();
+  });
+
+  // nearestScale
+  it('nearestScale: exact match', () => {
+    expect(stNearestScale(8, [4, 8, 16])).toBe(8);
+  });
+
+  it('nearestScale: rounds down when closer to smaller', () => {
+    expect(stNearestScale(5, [4, 8, 16])).toBe(4);
+  });
+
+  it('nearestScale: rounds up when closer to larger', () => {
+    expect(stNearestScale(7, [4, 8, 16])).toBe(8);
+  });
+
+  // isOnScale
+  it('isOnScale: exact → true', () => {
+    expect(stIsOnScale(8, [4, 8, 16])).toBe(true);
+  });
+
+  it('isOnScale: within 0.5 tolerance → true', () => {
+    expect(stIsOnScale(8.4, [8])).toBe(true);
+  });
+
+  it('isOnScale: outside tolerance → false', () => {
+    expect(stIsOnScale(9, [8])).toBe(false);
+  });
+
+  // gapStats
+  it('gapStats: empty → zeros', () => {
+    const s = stGapStats([]);
+    expect(s.count).toBe(0);
+    expect(s.minGap).toBe(0);
+  });
+
+  it('gapStats: counts correctly', () => {
+    const s = stGapStats([{ value: 8 }, { value: 16 }, { value: 8 }]);
+    expect(s.count).toBe(3);
+    expect(s.uniqueValues).toBe(2);
+    expect(s.minGap).toBe(8);
+    expect(s.maxGap).toBe(16);
+  });
+
+  it('gapStats: average is correct', () => {
+    const s = stGapStats([{ value: 10 }, { value: 20 }]);
+    expect(s.avgGap).toBe(15);
+  });
+});
