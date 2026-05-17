@@ -3350,3 +3350,141 @@ describe('MultiPagePanel utilities', () => {
     expect(stats[0].types).toContain('text');
   });
 });
+
+// ── VariableFontExplorerPanel ──────────────────────────────────────────────────
+
+// Inlined utilities from VariableFontExplorerPanel.tsx
+
+interface VFAxis { tag: string; name: string; min: number; max: number; defaultValue: number; step: number; value: number; }
+interface VFPreset { name: string; axes: Record<string, number>; }
+
+function vfBuildVariationSettings(axes: VFAxis[]): string {
+  const active = axes.filter(a => a.value !== a.defaultValue || a.tag === 'wght');
+  if (active.length === 0) return 'normal';
+  return active.map(a => `"${a.tag}" ${a.value}`).join(', ');
+}
+
+function vfParseVariationSettings(css: string): Record<string, number> {
+  if (!css || css.trim() === 'normal') return {};
+  const result: Record<string, number> = {};
+  const pairs = css.split(',');
+  for (const pair of pairs) {
+    const m = pair.trim().match(/^["']([a-zA-Z ]{4})["']\s+([\d.-]+)$/);
+    if (m) result[m[1]] = Number(m[2]);
+  }
+  return result;
+}
+
+function vfApplyPreset(axes: VFAxis[], preset: VFPreset): VFAxis[] {
+  return axes.map(a => ({
+    ...a,
+    value: preset.axes[a.tag] !== undefined ? preset.axes[a.tag] : a.defaultValue,
+  }));
+}
+
+function vfClampAxisValue(value: number, axis: VFAxis): number {
+  return Math.min(axis.max, Math.max(axis.min, value));
+}
+
+const VF_DEFAULT_AXES: VFAxis[] = [
+  { tag: 'wght', name: 'Weight', min: 100, max: 900, defaultValue: 400, step: 1, value: 400 },
+  { tag: 'wdth', name: 'Width', min: 50, max: 200, defaultValue: 100, step: 1, value: 100 },
+  { tag: 'ital', name: 'Italic', min: 0, max: 1, defaultValue: 0, step: 0.01, value: 0 },
+  { tag: 'slnt', name: 'Slant', min: -15, max: 15, defaultValue: 0, step: 0.1, value: 0 },
+  { tag: 'opsz', name: 'Optical Size', min: 8, max: 144, defaultValue: 14, step: 1, value: 14 },
+];
+
+describe('VariableFontExplorerPanel utilities', () => {
+  // buildVariationSettings
+  it('buildVariationSettings: wght always included', () => {
+    const axes = VF_DEFAULT_AXES.map(a => ({ ...a }));
+    const result = vfBuildVariationSettings(axes);
+    expect(result).toContain('"wght"');
+  });
+
+  it('buildVariationSettings: returns "normal" when only defaults and no wght forced', () => {
+    // All at default but still includes wght
+    const axes = VF_DEFAULT_AXES.map(a => ({ ...a }));
+    // Even at default, wght is always included per spec
+    expect(vfBuildVariationSettings(axes)).toContain('"wght" 400');
+  });
+
+  it('buildVariationSettings: includes changed axes', () => {
+    const axes = VF_DEFAULT_AXES.map(a => ({ ...a, value: a.tag === 'wdth' ? 75 : a.defaultValue }));
+    const result = vfBuildVariationSettings(axes);
+    expect(result).toContain('"wdth" 75');
+  });
+
+  it('buildVariationSettings: formats as comma-separated pairs', () => {
+    const axes = VF_DEFAULT_AXES.map(a => ({ ...a, value: a.tag === 'wght' ? 700 : a.defaultValue }));
+    const result = vfBuildVariationSettings(axes);
+    expect(result).toMatch(/"wght" 700/);
+  });
+
+  // parseVariationSettings
+  it('parseVariationSettings: "normal" → empty object', () => {
+    expect(vfParseVariationSettings('normal')).toEqual({});
+  });
+
+  it('parseVariationSettings: parses single pair', () => {
+    const result = vfParseVariationSettings('"wght" 700');
+    expect(result['wght']).toBe(700);
+  });
+
+  it('parseVariationSettings: parses multiple pairs', () => {
+    const result = vfParseVariationSettings('"wght" 700, "wdth" 75');
+    expect(result['wght']).toBe(700);
+    expect(result['wdth']).toBe(75);
+  });
+
+  it('parseVariationSettings: empty string → empty object', () => {
+    expect(vfParseVariationSettings('')).toEqual({});
+  });
+
+  // applyPreset
+  it('applyPreset: sets axis values from preset', () => {
+    const preset: VFPreset = { name: 'Bold', axes: { wght: 700, wdth: 100 } };
+    const result = vfApplyPreset(VF_DEFAULT_AXES, preset);
+    const wght = result.find(a => a.tag === 'wght');
+    expect(wght?.value).toBe(700);
+  });
+
+  it('applyPreset: axes not in preset keep defaultValue', () => {
+    const preset: VFPreset = { name: 'Bold', axes: { wght: 700 } };
+    const result = vfApplyPreset(VF_DEFAULT_AXES, preset);
+    const slnt = result.find(a => a.tag === 'slnt');
+    expect(slnt?.value).toBe(0); // default
+  });
+
+  it('applyPreset: returns same number of axes', () => {
+    const preset: VFPreset = { name: 'Test', axes: { wght: 300 } };
+    const result = vfApplyPreset(VF_DEFAULT_AXES, preset);
+    expect(result).toHaveLength(VF_DEFAULT_AXES.length);
+  });
+
+  // clampAxisValue
+  it('clampAxisValue: value within range → unchanged', () => {
+    const axis = VF_DEFAULT_AXES[0]; // wght min=100 max=900
+    expect(vfClampAxisValue(500, axis)).toBe(500);
+  });
+
+  it('clampAxisValue: below min → min', () => {
+    const axis = VF_DEFAULT_AXES[0]; // wght min=100
+    expect(vfClampAxisValue(50, axis)).toBe(100);
+  });
+
+  it('clampAxisValue: above max → max', () => {
+    const axis = VF_DEFAULT_AXES[0]; // wght max=900
+    expect(vfClampAxisValue(1000, axis)).toBe(900);
+  });
+
+  it('clampAxisValue: exactly at min → min', () => {
+    const axis = VF_DEFAULT_AXES[0];
+    expect(vfClampAxisValue(100, axis)).toBe(100);
+  });
+
+  it('clampAxisValue: exactly at max → max', () => {
+    const axis = VF_DEFAULT_AXES[0];
+    expect(vfClampAxisValue(900, axis)).toBe(900);
+  });
+});

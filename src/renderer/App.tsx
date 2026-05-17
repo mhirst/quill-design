@@ -134,6 +134,7 @@ import { ZIndexVisualizerPanel } from './components/canvas/ZIndexVisualizerPanel
 import { DesignMetricsPanel } from './components/canvas/DesignMetricsPanel';
 import { AttentionHeatmapPanel } from './components/canvas/AttentionHeatmapPanel';
 import { MultiPagePanel } from './components/canvas/MultiPagePanel';
+import { VariableFontExplorerPanel } from './components/canvas/VariableFontExplorerPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -537,6 +538,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showDesignMetrics, setShowDesignMetrics] = useState(false);
   const [showAttentionHeatmap, setShowAttentionHeatmap] = useState(false);
   const [showMultiPage, setShowMultiPage] = useState(false);
+  const [showVarFontExplorer, setShowVarFontExplorer] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -986,6 +988,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }
           // ── u — UI blocks ─────────────────────────────────────────────────
           case 'u': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowVarFontExplorer(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowUIBlocks(b => !b); return; }
             break;
           }
@@ -2982,6 +2985,20 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onPageChange={(page) => {
           drawingRef.current.reorderShapes(page.shapes);
           showToast(`Switched to "${page.name}"`, 'action');
+        }}
+      />
+
+      {/* Variable Font Axis Explorer (⌘⌥⇧U) */}
+      <VariableFontExplorerPanel
+        open={showVarFontExplorer}
+        onClose={() => setShowVarFontExplorer(false)}
+        selectedShape={selectedShape}
+        onApplyToShape={(patch) => {
+          const id = drawing.state.selectedId;
+          if (id) {
+            drawingRef.current.updateShape(id, patch);
+            showToast('Variable font applied', 'action');
+          }
         }}
       />
 
