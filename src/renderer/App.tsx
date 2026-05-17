@@ -114,6 +114,7 @@ import { CSSSnippetPanel } from './components/canvas/CSSSnippetPanel';
 import { SpacingHeatmapOverlay } from './components/canvas/SpacingHeatmapOverlay';
 import { DesignDiffPanel } from './components/canvas/DesignDiffPanel';
 import { ShapeVariationsPanel, type ShapePatch as VariationPatch } from './components/canvas/ShapeVariationsPanel';
+import { GlobalSearchPanel } from './components/canvas/GlobalSearchPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -497,6 +498,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showSpacingHeatmap, setShowSpacingHeatmap] = useState(false);
   const [showDesignDiff, setShowDesignDiff] = useState(false);
   const [showShapeVariations, setShowShapeVariations] = useState(false);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -828,6 +830,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ⌘⇧⌥F = Fluid Type, ⌘⇧F = Focus Mode, ⌘F = Spotlight
           case 'f': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowFluidType(f => !f); return; }
+            if (e.altKey && !e.shiftKey) { e.preventDefault(); setShowGlobalSearch(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setFocusModeActive(f => !f); showToast(focusModeActive ? 'Focus mode off' : 'Focus mode on', 'info'); return; }
             e.preventDefault(); setShowSpotlight(o => !o); return;
           }
@@ -2645,6 +2648,34 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           showToast(`Placed ${patches.length} variations`, 'action');
         }}
       />
+
+      {/* Global Search Panel (⌘⌥F) */}
+      {showGlobalSearch && (
+        <GlobalSearchPanel
+          open={showGlobalSearch}
+          onClose={() => setShowGlobalSearch(false)}
+          shapes={drawing.state.shapes}
+          onSelectShapes={(ids) => {
+            if (ids.length === 1) {
+              drawingRef.current.select(ids[0]);
+            } else {
+              drawingRef.current.setSelectedIds(ids);
+            }
+            setActiveTool('cursor');
+          }}
+          onPatchShapes={(patches) => {
+            for (const { id, patch } of patches) drawingRef.current.updateShape(id, patch);
+            showToast(`Updated ${patches.length} shapes`, 'action');
+          }}
+          onDeleteShapes={(ids) => {
+            for (const id of ids) {
+              drawingRef.current.select(id);
+              drawingRef.current.deleteSelected();
+            }
+            showToast(`Deleted ${ids.length} shapes`, 'action');
+          }}
+        />
+      )}
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
       <TypographySpecimenPanel
