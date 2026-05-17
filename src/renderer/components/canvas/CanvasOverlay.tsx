@@ -110,6 +110,69 @@ function getSnapPoint(
   };
 }
 
+/**
+ * Smart snap during shape move: snaps the EDGES of the moving shape to other
+ * shapes' edges, rather than snapping the raw cursor position.
+ * Returns adjusted (x, y) for the shape's top-left, and which guide lines to show.
+ */
+function getSnapForMove(
+  shapeX: number,    // tentative new x of moving shape
+  shapeY: number,    // tentative new y of moving shape
+  shapeW: number,
+  shapeH: number,
+  shapes: Shape[],
+  excludeIds: string[],
+  zoom: number,
+): { x: number; y: number; snapX: number | null; snapY: number | null } {
+  const threshold = SNAP_THRESHOLD / zoom;
+  // Moving shape's candidate snap edges: left, center, right
+  const myXs = [shapeX, shapeX + shapeW / 2, shapeX + shapeW];
+  const myYs = [shapeY, shapeY + shapeH / 2, shapeY + shapeH];
+
+  let snapX: number | null = null;
+  let snapY: number | null = null;
+  let bestX = threshold + 1;
+  let bestY = threshold + 1;
+  // offsets from the moving shape's edges to its origin
+  let dxOffset = 0;
+  let dyOffset = 0;
+
+  for (const s of shapes) {
+    if (excludeIds.includes(s.id)) continue;
+    const targetXs = [s.x, s.x + s.width / 2, s.x + s.width];
+    const targetYs = [s.y, s.y + s.height / 2, s.y + s.height];
+
+    for (let mi = 0; mi < myXs.length; mi++) {
+      for (const tx of targetXs) {
+        const d = Math.abs(myXs[mi] - tx);
+        if (d < bestX) {
+          bestX = d;
+          snapX = tx;
+          // offset: how far from shapeX to the matching myX edge
+          dxOffset = myXs[mi] - shapeX;
+        }
+      }
+    }
+    for (let mi = 0; mi < myYs.length; mi++) {
+      for (const ty of targetYs) {
+        const d = Math.abs(myYs[mi] - ty);
+        if (d < bestY) {
+          bestY = d;
+          snapY = ty;
+          dyOffset = myYs[mi] - shapeY;
+        }
+      }
+    }
+  }
+
+  return {
+    x: snapX !== null ? snapX - dxOffset : shapeX,
+    y: snapY !== null ? snapY - dyOffset : shapeY,
+    snapX,
+    snapY,
+  };
+}
+
 export function CanvasOverlay({
   activeTool,
   shapes,
@@ -409,12 +472,23 @@ export function CanvasOverlay({
             onMoveStart(dragRef.current.shapeId, dragRef.current.originX, dragRef.current.originY, dragRef.current.shapeSnapshot);
           }
         }
-        // Snap while moving
+        // Smart edge-to-edge snap while moving
         const moving = shapes.find(s => s.id === selectedId);
-        if (moving) {
-          const snap = getSnapPoint(x, y, shapes, selectedId, zoomRef.current);
+        const movingSnapshot = dragRef.current.shapeSnapshot; // single Shape snapshot
+        if (moving && movingSnapshot) {
+          // Compute tentative new shape position based on cursor delta from drag origin
+          const originX = dragRef.current.originX;
+          const originY = dragRef.current.originY;
+          const tentativeX = movingSnapshot.x + (x - originX);
+          const tentativeY = movingSnapshot.y + (y - originY);
+          // Exclude all currently selected shapes from snap targets
+          const excludeIds = selectedIds.length > 1 ? selectedIds : [selectedId ?? movingSnapshot.id];
+          const snap = getSnapForMove(tentativeX, tentativeY, moving.width, moving.height, shapes, excludeIds, zoomRef.current);
           setSnapLines({ x: snap.snapX, y: snap.snapY });
-          onMove(snap.x, snap.y);
+          // Convert snapped shape position back to cursor space for onMove
+          const snappedCursorX = originX + (snap.x - movingSnapshot.x);
+          const snappedCursorY = originY + (snap.y - movingSnapshot.y);
+          onMove(snappedCursorX, snappedCursorY);
         } else {
           onMove(x, y);
         }
