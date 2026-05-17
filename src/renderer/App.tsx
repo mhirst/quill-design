@@ -145,6 +145,7 @@ import { ColorPaletteExtractor } from './components/canvas/ColorPaletteExtractor
 import { IconSearchPanel } from './components/canvas/IconSearchPanel';
 import type { IconDef } from './components/canvas/IconSearchPanel';
 import { CSSGridVisualizerPanel } from './components/canvas/CSSGridVisualizerPanel';
+import { AccessibilityAuditorPanel } from './components/canvas/AccessibilityAuditorPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -558,6 +559,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showColorPalette, setShowColorPalette] = useState(false);
   const [showIconSearch, setShowIconSearch] = useState(false);
   const [showCSSGrid, setShowCSSGrid] = useState(false);
+  const [showA11yAudit, setShowA11yAudit] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1128,8 +1130,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowColorTokens(v => !v); return; }
             break;
           }
-          // ── 7 — Typography Audit ──────────────────────────────────────────
+          // ── 7 — Typography Audit / Accessibility Auditor ──────────────────
           case '7': {
+            if (e.shiftKey) { e.preventDefault(); setShowA11yAudit(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowTypographyAudit(v => !v); return; }
             break;
           }
@@ -3121,6 +3124,14 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
       <CSSGridVisualizerPanel
         open={showCSSGrid}
         onClose={() => setShowCSSGrid(false)}
+      />
+
+      {/* Accessibility Auditor (⌘⇧7) */}
+      <AccessibilityAuditorPanel
+        open={showA11yAudit}
+        onClose={() => setShowA11yAudit(false)}
+        shapes={drawing.state.shapes}
+        onSelectShape={(id) => drawingRef.current.select(id)}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}

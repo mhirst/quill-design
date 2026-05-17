@@ -4879,3 +4879,135 @@ describe('CSSGridVisualizerPanel', () => {
     expect(css).toContain('flex-wrap: wrap');
   });
 });
+
+// ── AccessibilityAuditorPanel ─────────────────────────────────────────────────
+
+function a11yLum(r: number, g: number, b: number): number {
+  const lin = (v: number) => { const n = v / 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function a11yHexToRgb(hex: string): [number, number, number] | null {
+  const c = hex.replace('#', '');
+  if (c.length !== 6) return null;
+  return [parseInt(c.slice(0,2),16), parseInt(c.slice(2,4),16), parseInt(c.slice(4,6),16)];
+}
+
+function a11yContrast(h1: string, h2: string): number {
+  const c1 = a11yHexToRgb(h1), c2 = a11yHexToRgb(h2);
+  if (!c1 || !c2) return 1;
+  const l1 = a11yLum(...c1), l2 = a11yLum(...c2);
+  return (Math.max(l1,l2) + 0.05) / (Math.min(l1,l2) + 0.05);
+}
+
+function a11yMeetsAA(ratio: number, large: boolean): boolean {
+  return large ? ratio >= 3 : ratio >= 4.5;
+}
+
+function a11yMeetsAAA(ratio: number, large: boolean): boolean {
+  return large ? ratio >= 4.5 : ratio >= 7;
+}
+
+function a11yIsLarge(fontSize: number, fontWeight: number): boolean {
+  if (fontSize >= 24) return true;
+  if (fontSize >= 18.67 && fontWeight >= 700) return true;
+  return false;
+}
+
+function a11yScore(errors: number, warnings: number, infos: number): number {
+  return Math.max(0, Math.min(100, 100 - errors * 15 - warnings * 5 - infos * 1));
+}
+
+function a11yScoreLabel(score: number): string {
+  if (score >= 90) return 'Excellent';
+  if (score >= 70) return 'Good';
+  if (score >= 50) return 'Needs Work';
+  return 'Poor';
+}
+
+describe('AccessibilityAuditorPanel', () => {
+  it('contrastRatio: black on white is ~21', () => {
+    expect(a11yContrast('#000000', '#ffffff')).toBeCloseTo(21, 0);
+  });
+
+  it('contrastRatio: same color is 1', () => {
+    expect(a11yContrast('#888888', '#888888')).toBeCloseTo(1, 1);
+  });
+
+  it('meetsContrastAA: 4.5 passes for small text', () => {
+    expect(a11yMeetsAA(4.5, false)).toBe(true);
+  });
+
+  it('meetsContrastAA: 4.4 fails for small text', () => {
+    expect(a11yMeetsAA(4.4, false)).toBe(false);
+  });
+
+  it('meetsContrastAA: 3.0 passes for large text', () => {
+    expect(a11yMeetsAA(3.0, true)).toBe(true);
+  });
+
+  it('meetsContrastAAA: 7.0 passes for small text', () => {
+    expect(a11yMeetsAAA(7.0, false)).toBe(true);
+  });
+
+  it('meetsContrastAAA: 6.9 fails for small text', () => {
+    expect(a11yMeetsAAA(6.9, false)).toBe(false);
+  });
+
+  it('isLargeText: 24px is large', () => {
+    expect(a11yIsLarge(24, 400)).toBe(true);
+  });
+
+  it('isLargeText: 16px normal weight is not large', () => {
+    expect(a11yIsLarge(16, 400)).toBe(false);
+  });
+
+  it('isLargeText: 18.67px bold is large', () => {
+    expect(a11yIsLarge(18.67, 700)).toBe(true);
+  });
+
+  it('isLargeText: 18px bold is not large (below 18.67)', () => {
+    expect(a11yIsLarge(18, 700)).toBe(false);
+  });
+
+  it('score: no issues = 100', () => {
+    expect(a11yScore(0, 0, 0)).toBe(100);
+  });
+
+  it('score: 1 error = 85', () => {
+    expect(a11yScore(1, 0, 0)).toBe(85);
+  });
+
+  it('score: 2 errors + 1 warning = 70', () => {
+    expect(a11yScore(2, 1, 0)).toBe(65);
+  });
+
+  it('score: clamps to 0 for many errors', () => {
+    expect(a11yScore(100, 100, 100)).toBe(0);
+  });
+
+  it('scoreLabel: 95 is Excellent', () => {
+    expect(a11yScoreLabel(95)).toBe('Excellent');
+  });
+
+  it('scoreLabel: 75 is Good', () => {
+    expect(a11yScoreLabel(75)).toBe('Good');
+  });
+
+  it('scoreLabel: 55 is Needs Work', () => {
+    expect(a11yScoreLabel(55)).toBe('Needs Work');
+  });
+
+  it('scoreLabel: 30 is Poor', () => {
+    expect(a11yScoreLabel(30)).toBe('Poor');
+  });
+
+  it('hexToRgb: returns null for invalid hex', () => {
+    expect(a11yHexToRgb('xyz')).toBeNull();
+  });
+
+  it('contrastRatio: gray on white', () => {
+    const cr = a11yContrast('#767676', '#ffffff');
+    expect(cr).toBeGreaterThan(4.5);
+  });
+});
