@@ -102,6 +102,7 @@ import { LayoutInspectorOverlay } from './components/canvas/LayoutInspectorOverl
 import { AssetLibraryPanel, type Asset as LibraryAsset } from './components/canvas/AssetLibraryPanel';
 import { SmartRenamePanel } from './components/canvas/SmartRenamePanel';
 import { CanvasComparePanel } from './components/canvas/CanvasComparePanel';
+import { MotionPreviewPanel } from './components/canvas/MotionPreviewPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -473,6 +474,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
   const [showSmartRename, setShowSmartRename] = useState(false);
   const [showCanvasCompare, setShowCanvasCompare] = useState(false);
+  const [showMotionPreview, setShowMotionPreview] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -847,9 +849,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowAssetLibrary(v => !v); return; }
             break;
           }
-          // ── m — Snapshots / Morph blend / Minimap ─────────────────────────
+          // ── m — Snapshots / Morph blend / Minimap / Motion Preview ─────────
           case 'm': {
-            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMorphBlend(m => !m); return; }
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMotionPreview(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowSnapshots(o => !o); return; }
             if (e.altKey) { e.preventDefault(); setShowMinimap(v => !v); return; }
             break;
@@ -2444,6 +2446,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }
           return fallback.toDataURL('image/png');
         }}
+      />
+
+      {/* Motion Preview Panel (⌘⇧⌥M) */}
+      <MotionPreviewPanel
+        open={showMotionPreview}
+        onClose={() => setShowMotionPreview(false)}
+        selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
       />
 
       {/* Keyboard shortcuts overlay */}
