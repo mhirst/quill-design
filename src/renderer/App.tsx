@@ -150,6 +150,7 @@ import { EasingCurveEditor } from './components/canvas/EasingCurveEditor';
 import { DesignTokenMapper } from './components/canvas/DesignTokenMapper';
 import type { ShapeProperty } from './components/canvas/DesignTokenMapper';
 import { ImageFilterStudio } from './components/canvas/ImageFilterStudio';
+import { ShadowBuilderPanel } from './components/canvas/ShadowBuilderPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -567,6 +568,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showEasingEditor, setShowEasingEditor] = useState(false);
   const [showTokenMapper, setShowTokenMapper] = useState(false);
   const [showFilterStudio, setShowFilterStudio] = useState(false);
+  const [showShadowBuilder, setShowShadowBuilder] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1082,6 +1084,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── x — Accessibility ─────────────────────────────────────────────
           case 'x': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowAccessibility(a => !a); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowShadowBuilder(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowCSSSnippet(v => !v); return; }
             break;
           }
@@ -3154,6 +3157,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
       <ImageFilterStudio
         open={showFilterStudio}
         onClose={() => setShowFilterStudio(false)}
+      />
+
+      {/* Shadow Builder Panel (⌘⇧X) */}
+      <ShadowBuilderPanel
+        open={showShadowBuilder}
+        onClose={() => setShowShadowBuilder(false)}
       />
 
       {/* Design Token Mapper (⌘⌥U) */}

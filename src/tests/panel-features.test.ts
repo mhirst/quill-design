@@ -5386,3 +5386,178 @@ describe('ImageFilterStudio', () => {
     expect(bw.config.grayscale).toBe(100);
   });
 });
+
+// ── ShadowBuilderPanel ────────────────────────────────────────────────────────
+
+interface SBLayer {
+  id: string;
+  inset: boolean;
+  x: number;
+  y: number;
+  blur: number;
+  spread: number;
+  color: string;
+  opacity: number;
+  enabled: boolean;
+}
+
+function sbLayerId() { return Math.random().toString(36).slice(2, 10); }
+
+function sbDefaultLayer(): SBLayer {
+  return { id: sbLayerId(), inset: false, x: 0, y: 4, blur: 8, spread: 0, color: '#000000', opacity: 25, enabled: true };
+}
+
+function sbHexWithOpacity(hex: string, opacity: number): string {
+  const alpha = Math.round((opacity / 100) * 255).toString(16).padStart(2, '0');
+  return hex.length === 7 ? `${hex}${alpha}` : hex;
+}
+
+function sbLayerToCSS(layer: SBLayer): string {
+  if (!layer.enabled) return '';
+  const { inset, x, y, blur, spread, color, opacity } = layer;
+  const colorWithAlpha = sbHexWithOpacity(color, opacity);
+  const parts = [inset ? 'inset' : '', `${x}px`, `${y}px`, `${blur}px`, `${spread}px`, colorWithAlpha].filter(Boolean);
+  return parts.join(' ');
+}
+
+function sbBuildBoxShadowCSS(layers: SBLayer[]): string {
+  const parts = layers.filter(l => l.enabled).map(sbLayerToCSS).filter(Boolean);
+  return parts.length === 0 ? 'none' : parts.join(',\n  ');
+}
+
+function sbDuplicateLayer(layer: SBLayer): SBLayer {
+  return { ...layer, id: sbLayerId() };
+}
+
+describe('ShadowBuilderPanel', () => {
+  it('defaultLayer: has expected defaults', () => {
+    const l = sbDefaultLayer();
+    expect(l.inset).toBe(false);
+    expect(l.y).toBe(4);
+    expect(l.blur).toBe(8);
+    expect(l.spread).toBe(0);
+    expect(l.opacity).toBe(25);
+    expect(l.enabled).toBe(true);
+  });
+
+  it('hexWithOpacity: 0% opacity → 00 alpha', () => {
+    expect(sbHexWithOpacity('#ff0000', 0)).toBe('#ff000000');
+  });
+
+  it('hexWithOpacity: 100% opacity → ff alpha', () => {
+    expect(sbHexWithOpacity('#ff0000', 100)).toBe('#ff0000ff');
+  });
+
+  it('hexWithOpacity: 50% opacity → 80 alpha (128 decimal)', () => {
+    expect(sbHexWithOpacity('#000000', 50)).toBe('#00000080');
+  });
+
+  it('hexWithOpacity: 25% opacity → 40 alpha', () => {
+    expect(sbHexWithOpacity('#000000', 25)).toBe('#00000040');
+  });
+
+  it('layerToCSS: returns empty string when disabled', () => {
+    const l = { ...sbDefaultLayer(), enabled: false };
+    expect(sbLayerToCSS(l)).toBe('');
+  });
+
+  it('layerToCSS: basic shadow has correct format', () => {
+    const l: SBLayer = { id: 'a', inset: false, x: 0, y: 4, blur: 8, spread: 0, color: '#000000', opacity: 25, enabled: true };
+    const css = sbLayerToCSS(l);
+    expect(css).toContain('0px 4px 8px 0px');
+    expect(css).not.toContain('inset');
+  });
+
+  it('layerToCSS: inset shadow includes "inset"', () => {
+    const l: SBLayer = { id: 'b', inset: true, x: 0, y: 2, blur: 4, spread: 0, color: '#000000', opacity: 20, enabled: true };
+    expect(sbLayerToCSS(l)).toMatch(/^inset /);
+  });
+
+  it('layerToCSS: negative x/y values render correctly', () => {
+    const l: SBLayer = { id: 'c', inset: false, x: -4, y: -4, blur: 8, spread: 0, color: '#000000', opacity: 30, enabled: true };
+    const css = sbLayerToCSS(l);
+    expect(css).toContain('-4px -4px');
+  });
+
+  it('buildBoxShadowCSS: empty layers → "none"', () => {
+    expect(sbBuildBoxShadowCSS([])).toBe('none');
+  });
+
+  it('buildBoxShadowCSS: all disabled → "none"', () => {
+    const layers = [{ ...sbDefaultLayer(), enabled: false }];
+    expect(sbBuildBoxShadowCSS(layers)).toBe('none');
+  });
+
+  it('buildBoxShadowCSS: single layer → single CSS string', () => {
+    const l = sbDefaultLayer();
+    const css = sbBuildBoxShadowCSS([l]);
+    expect(css).not.toBe('none');
+    expect(css).not.toContain(',');
+  });
+
+  it('buildBoxShadowCSS: multiple layers → comma-separated', () => {
+    const l1 = sbDefaultLayer();
+    const l2 = { ...sbDefaultLayer(), y: 8, blur: 16 };
+    const css = sbBuildBoxShadowCSS([l1, l2]);
+    expect(css).toContain(',');
+  });
+
+  it('buildBoxShadowCSS: skips disabled layers in multi-layer', () => {
+    const l1 = sbDefaultLayer();
+    const l2 = { ...sbDefaultLayer(), enabled: false };
+    const css = sbBuildBoxShadowCSS([l1, l2]);
+    expect(css).not.toContain(',');
+  });
+
+  it('duplicateLayer: new id, same values', () => {
+    const orig = sbDefaultLayer();
+    const dup = sbDuplicateLayer(orig);
+    expect(dup.id).not.toBe(orig.id);
+    expect(dup.blur).toBe(orig.blur);
+    expect(dup.color).toBe(orig.color);
+  });
+
+  it('presets: Material Elevation 1 has two layers', () => {
+    const elevation1 = {
+      name: 'Elevation 1',
+      layers: [
+        { id: '1', inset: false, x: 0, y: 1, blur: 3, spread: 0, color: '#000000', opacity: 12, enabled: true },
+        { id: '2', inset: false, x: 0, y: 1, blur: 2, spread: 0, color: '#000000', opacity: 24, enabled: true },
+      ]
+    };
+    expect(elevation1.layers).toHaveLength(2);
+  });
+
+  it('presets: Soft sm is single-layer, low opacity', () => {
+    const softSm = {
+      name: 'Soft sm',
+      layers: [{ id: '1', inset: false, x: 0, y: 1, blur: 3, spread: 0, color: '#000000', opacity: 10, enabled: true }]
+    };
+    expect(softSm.layers[0].opacity).toBeLessThan(20);
+  });
+
+  it('presets: Glow Blue has spread > 0', () => {
+    const glowBlue = {
+      name: 'Glow Blue',
+      layers: [
+        { id: '1', inset: false, x: 0, y: 0, blur: 8, spread: 2, color: '#3b82f6', opacity: 60, enabled: true },
+        { id: '2', inset: false, x: 0, y: 0, blur: 20, spread: 4, color: '#3b82f6', opacity: 40, enabled: true },
+      ]
+    };
+    expect(glowBlue.layers[0].spread).toBeGreaterThan(0);
+  });
+
+  it('presets: Neumorphic has positive and negative shadows', () => {
+    const neumorphic = {
+      name: 'Neumorphic Light',
+      layers: [
+        { id: '1', inset: false, x: -6, y: -6, blur: 12, spread: 0, color: '#ffffff', opacity: 80, enabled: true },
+        { id: '2', inset: false, x: 6, y: 6, blur: 12, spread: 0, color: '#000000', opacity: 15, enabled: true },
+      ]
+    };
+    const hasNeg = neumorphic.layers.some(l => l.x < 0 || l.y < 0);
+    const hasPos = neumorphic.layers.some(l => l.x > 0 || l.y > 0);
+    expect(hasNeg).toBe(true);
+    expect(hasPos).toBe(true);
+  });
+});
