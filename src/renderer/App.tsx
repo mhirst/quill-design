@@ -115,6 +115,7 @@ import { SpacingHeatmapOverlay } from './components/canvas/SpacingHeatmapOverlay
 import { DesignDiffPanel } from './components/canvas/DesignDiffPanel';
 import { ShapeVariationsPanel, type ShapePatch as VariationPatch } from './components/canvas/ShapeVariationsPanel';
 import { GlobalSearchPanel } from './components/canvas/GlobalSearchPanel';
+import { ColorVisionOverlay } from './components/canvas/ColorVisionOverlay';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -499,6 +500,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showDesignDiff, setShowDesignDiff] = useState(false);
   const [showShapeVariations, setShowShapeVariations] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showColorVision, setShowColorVision] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -787,12 +789,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { setShowAnimationTween(a => !a); return; }
             const d = drawingRef.current; if (d.state.shapes.length === 0) return; d.selectAll(); setActiveTool('cursor'); return;
           }
-          // ── b — Batch rename / Pattern fill / Moodboard ───────────────────
-          // ⌘⇧⌥B = Moodboard, ⌘⇧B = Batch Rename, ⌘⌥B = Pattern Fill
+          // ── b — Batch rename / Color Vision / Pattern fill / Moodboard ──────
+          // ⌘⇧⌥B = Moodboard, ⌘⇧B = Batch Rename, ⌘⌥B = Color Vision Sim, ⌘⌥⇧B = Pattern Fill
           case 'b': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMoodboard(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowBatchRename(o => !o); return; }
-            if (e.altKey) { e.preventDefault(); setShowPatternFill(p => !p); return; }
+            if (e.altKey) { e.preventDefault(); setShowColorVision(v => !v); return; }
             break;
           }
           // ── c — Copy / Center / Content fill / Canvas Compare ─────────────
@@ -2676,6 +2678,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }}
         />
       )}
+
+      {/* Color Vision Overlay (⌘⌥B) */}
+      <ColorVisionOverlay
+        open={showColorVision}
+        canvasWidth={canvasSize.width}
+        canvasHeight={canvasSize.height}
+      />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
       <TypographySpecimenPanel
