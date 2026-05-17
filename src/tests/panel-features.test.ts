@@ -3488,3 +3488,172 @@ describe('VariableFontExplorerPanel utilities', () => {
     expect(vfClampAxisValue(900, axis)).toBe(900);
   });
 });
+
+// ── BlendModesPanel ────────────────────────────────────────────────────────────
+
+// Inlined utilities from BlendModesPanel.tsx
+
+type BM_Category = 'normal' | 'darken' | 'lighten' | 'contrast' | 'composite' | 'component';
+interface BMInfo { mode: string; label: string; category: BM_Category; description: string; formula: string; }
+
+const BM_ALL: BMInfo[] = [
+  { mode: 'normal', label: 'Normal', category: 'normal', description: 'No blending', formula: 'Cs' },
+  { mode: 'multiply', label: 'Multiply', category: 'darken', description: 'Multiply', formula: 'Cs × Cb' },
+  { mode: 'screen', label: 'Screen', category: 'lighten', description: 'Screen', formula: '1-(1-Cs)(1-Cb)' },
+  { mode: 'overlay', label: 'Overlay', category: 'contrast', description: 'Overlay', formula: 'Cb<0.5...' },
+  { mode: 'darken', label: 'Darken', category: 'darken', description: 'Darken', formula: 'min(Cs,Cb)' },
+  { mode: 'lighten', label: 'Lighten', category: 'lighten', description: 'Lighten', formula: 'max(Cs,Cb)' },
+  { mode: 'difference', label: 'Difference', category: 'composite', description: 'Difference', formula: '|Cs-Cb|' },
+  { mode: 'exclusion', label: 'Exclusion', category: 'composite', description: 'Exclusion', formula: 'Cs+Cb-2CsCb' },
+  { mode: 'hue', label: 'Hue', category: 'component', description: 'Hue', formula: 'Hue(Cs)' },
+  { mode: 'saturation', label: 'Saturation', category: 'component', description: 'Saturation', formula: 'Sat(Cs)' },
+  { mode: 'color', label: 'Color', category: 'component', description: 'Color', formula: 'Hue+Sat(Cs)' },
+  { mode: 'luminosity', label: 'Luminosity', category: 'component', description: 'Luminosity', formula: 'Lum(Cs)' },
+];
+
+function bmGetByCategory(cat: BM_Category): BMInfo[] {
+  return BM_ALL.filter(m => m.category === cat);
+}
+
+function bmBuildCSS(mode: string, useBackground = false): string {
+  return useBackground ? `background-blend-mode: ${mode};` : `mix-blend-mode: ${mode};`;
+}
+
+function bmHexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return null;
+  return { r: parseInt(clean.slice(0, 2), 16) / 255, g: parseInt(clean.slice(2, 4), 16) / 255, b: parseInt(clean.slice(4, 6), 16) / 255 };
+}
+
+function bmRgbToHex(r: number, g: number, b: number): string {
+  const toHex = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
+  return '#' + toHex(r) + toHex(g) + toHex(b);
+}
+
+function bmMultiply(s: { r: number; g: number; b: number }, bg: { r: number; g: number; b: number }) {
+  return { r: s.r * bg.r, g: s.g * bg.g, b: s.b * bg.b };
+}
+
+function bmScreen(s: { r: number; g: number; b: number }, bg: { r: number; g: number; b: number }) {
+  return { r: 1 - (1 - s.r) * (1 - bg.r), g: 1 - (1 - s.g) * (1 - bg.g), b: 1 - (1 - s.b) * (1 - bg.b) };
+}
+
+function bmDifference(s: { r: number; g: number; b: number }, bg: { r: number; g: number; b: number }) {
+  return { r: Math.abs(s.r - bg.r), g: Math.abs(s.g - bg.g), b: Math.abs(s.b - bg.b) };
+}
+
+function bmOverlayChannel(s: number, bg: number): number {
+  return bg < 0.5 ? 2 * s * bg : 1 - 2 * (1 - s) * (1 - bg);
+}
+
+describe('BlendModesPanel utilities', () => {
+  // getModesByCategory
+  it('getModesByCategory: darken category has multiply and darken', () => {
+    const modes = bmGetByCategory('darken');
+    const names = modes.map(m => m.mode);
+    expect(names).toContain('multiply');
+    expect(names).toContain('darken');
+  });
+
+  it('getModesByCategory: lighten category has screen and lighten', () => {
+    const modes = bmGetByCategory('lighten');
+    const names = modes.map(m => m.mode);
+    expect(names).toContain('screen');
+    expect(names).toContain('lighten');
+  });
+
+  it('getModesByCategory: composite category has difference and exclusion', () => {
+    const modes = bmGetByCategory('composite');
+    const names = modes.map(m => m.mode);
+    expect(names).toContain('difference');
+    expect(names).toContain('exclusion');
+  });
+
+  // buildBlendCSS
+  it('buildBlendCSS: mix-blend-mode by default', () => {
+    expect(bmBuildCSS('multiply')).toBe('mix-blend-mode: multiply;');
+  });
+
+  it('buildBlendCSS: background-blend-mode when flag set', () => {
+    expect(bmBuildCSS('multiply', true)).toBe('background-blend-mode: multiply;');
+  });
+
+  // hexToRgb
+  it('hexToRgb: black → {0, 0, 0}', () => {
+    const result = bmHexToRgb('#000000');
+    expect(result).toEqual({ r: 0, g: 0, b: 0 });
+  });
+
+  it('hexToRgb: white → {1, 1, 1}', () => {
+    const result = bmHexToRgb('#ffffff');
+    expect(result?.r).toBeCloseTo(1);
+    expect(result?.g).toBeCloseTo(1);
+    expect(result?.b).toBeCloseTo(1);
+  });
+
+  it('hexToRgb: invalid length → null', () => {
+    expect(bmHexToRgb('#fff')).toBeNull();
+  });
+
+  // rgbToHex
+  it('rgbToHex: {0,0,0} → #000000', () => {
+    expect(bmRgbToHex(0, 0, 0)).toBe('#000000');
+  });
+
+  it('rgbToHex: {1,1,1} → #ffffff', () => {
+    expect(bmRgbToHex(1, 1, 1)).toBe('#ffffff');
+  });
+
+  it('rgbToHex: clamps above 1', () => {
+    expect(bmRgbToHex(2, 0, 0)).toBe('#ff0000');
+  });
+
+  // blendMultiply
+  it('blendMultiply: white×color → color', () => {
+    const src = { r: 0.5, g: 0.5, b: 0.5 };
+    const bg = { r: 1, g: 1, b: 1 };
+    const result = bmMultiply(src, bg);
+    expect(result.r).toBeCloseTo(0.5);
+  });
+
+  it('blendMultiply: black×anything → black', () => {
+    const result = bmMultiply({ r: 0, g: 0, b: 0 }, { r: 1, g: 0.5, b: 0.3 });
+    expect(result.r).toBe(0);
+    expect(result.g).toBe(0);
+  });
+
+  // blendScreen
+  it('blendScreen: black+color → color', () => {
+    const result = bmScreen({ r: 0, g: 0, b: 0 }, { r: 0.5, g: 0.3, b: 0.7 });
+    expect(result.r).toBeCloseTo(0.5);
+  });
+
+  it('blendScreen: white+anything → white', () => {
+    const result = bmScreen({ r: 1, g: 1, b: 1 }, { r: 0.3, g: 0.5, b: 0.7 });
+    expect(result.r).toBeCloseTo(1);
+  });
+
+  // blendDifference
+  it('blendDifference: same colors → black', () => {
+    const c = { r: 0.5, g: 0.5, b: 0.5 };
+    const result = bmDifference(c, c);
+    expect(result.r).toBeCloseTo(0);
+    expect(result.g).toBeCloseTo(0);
+  });
+
+  it('blendDifference: white-black → white', () => {
+    const result = bmDifference({ r: 1, g: 1, b: 1 }, { r: 0, g: 0, b: 0 });
+    expect(result.r).toBeCloseTo(1);
+  });
+
+  // blendOverlayChannel
+  it('blendOverlayChannel: bg=0.25 uses multiply branch', () => {
+    // bg < 0.5 → 2*s*bg
+    expect(bmOverlayChannel(0.5, 0.25)).toBeCloseTo(2 * 0.5 * 0.25);
+  });
+
+  it('blendOverlayChannel: bg=0.75 uses screen branch', () => {
+    // bg >= 0.5 → 1-2(1-s)(1-bg)
+    expect(bmOverlayChannel(0.5, 0.75)).toBeCloseTo(1 - 2 * 0.5 * 0.25);
+  });
+});

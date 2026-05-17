@@ -135,6 +135,7 @@ import { DesignMetricsPanel } from './components/canvas/DesignMetricsPanel';
 import { AttentionHeatmapPanel } from './components/canvas/AttentionHeatmapPanel';
 import { MultiPagePanel } from './components/canvas/MultiPagePanel';
 import { VariableFontExplorerPanel } from './components/canvas/VariableFontExplorerPanel';
+import { BlendModesPanel } from './components/canvas/BlendModesPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -539,6 +540,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showAttentionHeatmap, setShowAttentionHeatmap] = useState(false);
   const [showMultiPage, setShowMultiPage] = useState(false);
   const [showVarFontExplorer, setShowVarFontExplorer] = useState(false);
+  const [showBlendModes, setShowBlendModes] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -834,7 +836,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── b — Batch rename / Color Vision / Pattern fill / Moodboard ──────
           // ⌘⇧⌥B = Moodboard, ⌘⇧B = Batch Rename, ⌘⌥B = Color Vision Sim, ⌘⌥⇧B = Pattern Fill
           case 'b': {
-            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMoodboard(v => !v); return; }
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowBlendModes(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowBatchRename(o => !o); return; }
             if (e.altKey) { e.preventDefault(); setShowColorVision(v => !v); return; }
             break;
@@ -2998,6 +3000,20 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           if (id) {
             drawingRef.current.updateShape(id, patch);
             showToast('Variable font applied', 'action');
+          }
+        }}
+      />
+
+      {/* Blend Modes Visualizer (⌘⌥⇧B) */}
+      <BlendModesPanel
+        open={showBlendModes}
+        onClose={() => setShowBlendModes(false)}
+        selectedShape={selectedShape}
+        onApplyToShape={(patch) => {
+          const id = drawing.state.selectedId;
+          if (id) {
+            drawingRef.current.updateShape(id, patch);
+            showToast('Blend mode applied', 'action');
           }
         }}
       />
