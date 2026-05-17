@@ -2587,3 +2587,111 @@ describe('BreakpointSimulatorPanel utilities', () => {
     expect(css).toContain('.my-wrap');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ComponentAnalyzerPanel — inlined utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+function bucketNumberTest(value: number, step: number): number {
+  return Math.round(value / step) * step;
+}
+
+function bucketColorTest(hex: string): string {
+  if (!hex || hex === 'transparent' || hex === 'none') return 'none';
+  const h = hex.replace(/^#/, '').padEnd(6, '0').slice(0, 6);
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const luminance = (max + min) / 2;
+  const lumBucket = luminance < 64 ? 'dark' : luminance < 192 ? 'mid' : 'light';
+  if (max - min < 30) return `gray-${lumBucket}`;
+  if (max === r) return `red-${lumBucket}`;
+  if (max === g) return `green-${lumBucket}`;
+  return `blue-${lumBucket}`;
+}
+
+function suggestComponentNameTest(typeKey: string, colorKey: string, count: number): string {
+  const typeMap: Record<string, string> = {
+    rect: 'Box', ellipse: 'Circle', text: 'Label', frame: 'Frame',
+    line: 'Divider', arrow: 'Arrow', star: 'Star', polygon: 'Shape', image: 'Image',
+  };
+  const colorMap: Record<string, string> = {
+    'red-mid': 'Primary', 'blue-mid': 'Secondary', 'green-mid': 'Success',
+    'gray-dark': 'Dark', 'gray-mid': 'Muted', 'gray-light': 'Light', 'none': '',
+  };
+  const typeName = typeMap[typeKey] ?? 'Component';
+  const colorName = colorMap[colorKey] ?? '';
+  const countHint = count >= 5 ? 'Repeated' : '';
+  return [countHint, colorName, typeName].filter(Boolean).join('');
+}
+
+describe('ComponentAnalyzerPanel utilities', () => {
+  // bucketNumber
+  it('bucketNumber: 22 → 20 (step 20)', () => {
+    expect(bucketNumberTest(22, 20)).toBe(20);
+  });
+
+  it('bucketNumber: 35 → 40 (step 20)', () => {
+    expect(bucketNumberTest(35, 20)).toBe(40);
+  });
+
+  it('bucketNumber: 0 → 0', () => {
+    expect(bucketNumberTest(0, 20)).toBe(0);
+  });
+
+  it('bucketNumber: exact multiple unchanged', () => {
+    expect(bucketNumberTest(60, 20)).toBe(60);
+  });
+
+  // bucketColor
+  it('bucketColor: transparent → "none"', () => {
+    expect(bucketColorTest('transparent')).toBe('none');
+  });
+
+  it('bucketColor: empty → "none"', () => {
+    expect(bucketColorTest('')).toBe('none');
+  });
+
+  it('bucketColor: pure red → "red-*"', () => {
+    expect(bucketColorTest('#ff0000')).toMatch(/^red-/);
+  });
+
+  it('bucketColor: pure blue → "blue-*"', () => {
+    expect(bucketColorTest('#0000ff')).toMatch(/^blue-/);
+  });
+
+  it('bucketColor: pure green → "green-*"', () => {
+    expect(bucketColorTest('#00ff00')).toMatch(/^green-/);
+  });
+
+  it('bucketColor: near-gray → "gray-*"', () => {
+    expect(bucketColorTest('#888888')).toMatch(/^gray-/);
+  });
+
+  it('bucketColor: black → "gray-dark"', () => {
+    expect(bucketColorTest('#000000')).toBe('gray-dark');
+  });
+
+  it('bucketColor: white → "gray-light"', () => {
+    expect(bucketColorTest('#ffffff')).toBe('gray-light');
+  });
+
+  // suggestComponentName
+  it('suggestComponentName: rect + blue-mid → "SecondaryBox"', () => {
+    expect(suggestComponentNameTest('rect', 'blue-mid', 2)).toBe('SecondaryBox');
+  });
+
+  it('suggestComponentName: ellipse + red-mid → "PrimaryCircle"', () => {
+    expect(suggestComponentNameTest('ellipse', 'red-mid', 2)).toBe('PrimaryCircle');
+  });
+
+  it('suggestComponentName: ≥5 instances → "Repeated" prefix', () => {
+    expect(suggestComponentNameTest('rect', 'none', 5)).toContain('Repeated');
+  });
+
+  it('suggestComponentName: unknown type → "Component"', () => {
+    expect(suggestComponentNameTest('pentagon', 'none', 2)).toBe('Component');
+  });
+});

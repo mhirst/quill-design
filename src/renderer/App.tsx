@@ -128,6 +128,7 @@ import { ColorTokensPanel } from './components/canvas/ColorTokensPanel';
 import { TypographyAuditPanel } from './components/canvas/TypographyAuditPanel';
 import { ShapeMorphPanel } from './components/canvas/ShapeMorphPanel';
 import { BreakpointSimulatorPanel } from './components/canvas/BreakpointSimulatorPanel';
+import { ComponentAnalyzerPanel } from './components/canvas/ComponentAnalyzerPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -525,6 +526,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showTypographyAudit, setShowTypographyAudit] = useState(false);
   const [showShapeMorph, setShowShapeMorph] = useState(false);
   const [showBreakpointSim, setShowBreakpointSim] = useState(false);
+  const [showComponentAnalyzer, setShowComponentAnalyzer] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1092,6 +1094,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── 9 — Breakpoint Simulator ──────────────────────────────────────
           case '9': {
             if (e.altKey) { e.preventDefault(); setShowBreakpointSim(v => !v); return; }
+            break;
+          }
+          // ── 0 — Component Analyzer ────────────────────────────────────────
+          case '0': {
+            if (e.altKey) { e.preventDefault(); setShowComponentAnalyzer(v => !v); return; }
             break;
           }
           // ── ] [ — Z-order ─────────────────────────────────────────────────
@@ -2892,6 +2899,17 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showBreakpointSim}
         onClose={() => setShowBreakpointSim(false)}
         shapes={drawing.state.shapes}
+      />
+
+      {/* Component Analyzer Panel (⌘⌥0) */}
+      <ComponentAnalyzerPanel
+        open={showComponentAnalyzer}
+        onClose={() => setShowComponentAnalyzer(false)}
+        shapes={drawing.state.shapes}
+        onSelectShapes={(ids) => {
+          drawing.setSelectedIds(ids);
+          showToast(`Selected ${ids.length} similar shape${ids.length !== 1 ? 's' : ''}`, 'action');
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
