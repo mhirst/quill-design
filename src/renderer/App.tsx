@@ -125,6 +125,7 @@ import { LayerStackPanel } from './components/canvas/LayerStackPanel';
 import { HandoffSpecPanel } from './components/canvas/HandoffSpecPanel';
 import { GeometryPanel } from './components/canvas/GeometryPanel';
 import { ColorTokensPanel } from './components/canvas/ColorTokensPanel';
+import { TypographyAuditPanel } from './components/canvas/TypographyAuditPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -519,6 +520,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showHandoffSpec, setShowHandoffSpec] = useState(false);
   const [showGeometry, setShowGeometry] = useState(false);
   const [showColorTokens, setShowColorTokens] = useState(false);
+  const [showTypographyAudit, setShowTypographyAudit] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1071,6 +1073,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── 6 — Color Tokens ──────────────────────────────────────────────
           case '6': {
             if (e.altKey) { e.preventDefault(); setShowColorTokens(v => !v); return; }
+            break;
+          }
+          // ── 7 — Typography Audit ──────────────────────────────────────────
+          case '7': {
+            if (e.altKey) { e.preventDefault(); setShowTypographyAudit(v => !v); return; }
             break;
           }
           // ── ] [ — Z-order ─────────────────────────────────────────────────
@@ -2836,6 +2843,20 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showColorTokens}
         onClose={() => setShowColorTokens(false)}
         shapes={drawing.state.shapes}
+      />
+
+      {/* Typography Audit Panel (⌘⌥7) */}
+      <TypographyAuditPanel
+        open={showTypographyAudit}
+        onClose={() => setShowTypographyAudit(false)}
+        shapes={drawing.state.shapes}
+        onPatchShapes={(patches) => {
+          patches.forEach(({ id, patch }) => drawingRef.current.updateShape(id, patch));
+          showToast(`Updated ${patches.length} shape${patches.length !== 1 ? 's' : ''}`, 'action');
+        }}
+        onSelectShape={(id) => {
+          drawingRef.current.select(id);
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}

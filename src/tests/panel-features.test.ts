@@ -2206,3 +2206,169 @@ describe('ColorTokensPanel utilities', () => {
     expect(scss.split('\n')).toHaveLength(2);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TypographyAuditPanel — inlined audit utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AuditEntry {
+  shapeId: string;
+  label: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: string;
+  lineHeight: string;
+  letterSpacing: string;
+  fill: string;
+  text: string;
+}
+
+interface AuditIssue {
+  severity: 'error' | 'warning' | 'info';
+  code: string;
+  message: string;
+  affectedIds: string[];
+}
+
+function uniqueFontSizesTest(entries: AuditEntry[]): number[] {
+  const sizes = new Set(entries.map(e => e.fontSize));
+  return [...sizes].sort((a, b) => a - b);
+}
+
+function uniqueFontFamiliesTest(entries: AuditEntry[]): string[] {
+  const fams = new Set(entries.map(e => e.fontFamily));
+  return [...fams].sort();
+}
+
+function snapTo8ptTest(size: number): number {
+  return Math.round(size / 8) * 8 || 8;
+}
+
+function snapToModularScaleTest(size: number, base: number, ratio: number): number {
+  let bestDiff = Infinity;
+  let best = base;
+  for (let n = -2; n <= 10; n++) {
+    const candidate = base * Math.pow(ratio, n);
+    const diff = Math.abs(size - candidate);
+    if (diff < bestDiff) { bestDiff = diff; best = candidate; }
+  }
+  return Math.round(best);
+}
+
+function auditTypographyTest(entries: AuditEntry[]): AuditIssue[] {
+  const issues: AuditIssue[] = [];
+  if (entries.length === 0) return issues;
+  const sizes = uniqueFontSizesTest(entries);
+  const families = uniqueFontFamiliesTest(entries);
+  if (sizes.length > 6) issues.push({ severity: 'error', code: 'TOO_MANY_SIZES', message: '', affectedIds: [] });
+  else if (sizes.length > 4) issues.push({ severity: 'warning', code: 'MANY_SIZES', message: '', affectedIds: [] });
+  if (families.length > 3) issues.push({ severity: 'error', code: 'TOO_MANY_FAMILIES', message: '', affectedIds: [] });
+  else if (families.length > 2) issues.push({ severity: 'warning', code: 'MANY_FAMILIES', message: '', affectedIds: [] });
+  const noLineHeight = entries.filter(e => !e.lineHeight);
+  if (noLineHeight.length > 0) issues.push({ severity: 'warning', code: 'MISSING_LINE_HEIGHT', message: '', affectedIds: [] });
+  const tiny = entries.filter(e => e.fontSize < 12);
+  if (tiny.length > 0) issues.push({ severity: 'error', code: 'TINY_TEXT', message: '', affectedIds: tiny.map(e => e.shapeId) });
+  const offGrid = entries.filter(e => e.fontSize % 8 !== 0 && e.fontSize % 4 !== 0);
+  if (offGrid.length > 0) issues.push({ severity: 'info', code: 'OFF_GRID', message: '', affectedIds: [] });
+  return issues;
+}
+
+function makeEntry(overrides: Partial<AuditEntry> = {}): AuditEntry {
+  return {
+    shapeId: 'id-' + Math.random().toString(36).slice(2),
+    label: 'Text',
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: '1.5',
+    letterSpacing: '0',
+    fill: '#000000',
+    text: 'Hello',
+    ...overrides,
+  };
+}
+
+describe('TypographyAuditPanel utilities', () => {
+  // uniqueFontSizes
+  it('uniqueFontSizes: returns sorted unique sizes', () => {
+    const entries = [makeEntry({ fontSize: 24 }), makeEntry({ fontSize: 16 }), makeEntry({ fontSize: 24 })];
+    expect(uniqueFontSizesTest(entries)).toEqual([16, 24]);
+  });
+
+  it('uniqueFontSizes: single entry', () => {
+    expect(uniqueFontSizesTest([makeEntry({ fontSize: 14 })])).toEqual([14]);
+  });
+
+  // uniqueFontFamilies
+  it('uniqueFontFamilies: deduplicates and sorts', () => {
+    const entries = [
+      makeEntry({ fontFamily: 'Roboto' }),
+      makeEntry({ fontFamily: 'Inter' }),
+      makeEntry({ fontFamily: 'Roboto' }),
+    ];
+    expect(uniqueFontFamiliesTest(entries)).toEqual(['Inter', 'Roboto']);
+  });
+
+  // snapTo8pt
+  it('snapTo8pt: 16 stays 16', () => { expect(snapTo8ptTest(16)).toBe(16); });
+  it('snapTo8pt: 13 → 16', () => { expect(snapTo8ptTest(13)).toBe(16); });
+  it('snapTo8pt: 11 → 8', () => { expect(snapTo8ptTest(11)).toBe(8); });
+  it('snapTo8pt: 0 → 8 (minimum)', () => { expect(snapTo8ptTest(0)).toBe(8); });
+  it('snapTo8pt: 30 → 32', () => { expect(snapTo8ptTest(30)).toBe(32); });
+
+  // snapToModularScale
+  it('snapToModularScale: base=16, ratio=1.25, size=16 → 16', () => {
+    expect(snapToModularScaleTest(16, 16, 1.25)).toBe(16);
+  });
+  it('snapToModularScale: base=16, ratio=1.25, size=20 → 20', () => {
+    expect(snapToModularScaleTest(20, 16, 1.25)).toBe(20);
+  });
+
+  // auditTypography — no issues for clean set
+  it('auditTypography: clean set → no issues', () => {
+    const entries = [
+      makeEntry({ fontSize: 32, fontFamily: 'Inter', lineHeight: '1.2' }),
+      makeEntry({ fontSize: 16, fontFamily: 'Inter', lineHeight: '1.5' }),
+    ];
+    const issues = auditTypographyTest(entries);
+    expect(issues.filter(i => i.severity === 'error' || i.severity === 'warning')).toHaveLength(0);
+  });
+
+  it('auditTypography: 7 sizes → TOO_MANY_SIZES error', () => {
+    const entries = [14, 16, 18, 20, 24, 32, 48].map(sz =>
+      makeEntry({ fontSize: sz, lineHeight: '1.5' })
+    );
+    const issues = auditTypographyTest(entries);
+    expect(issues.some(i => i.code === 'TOO_MANY_SIZES')).toBe(true);
+  });
+
+  it('auditTypography: 4 families → TOO_MANY_FAMILIES error', () => {
+    const entries = ['Inter', 'Roboto', 'Lato', 'Oswald'].map(f =>
+      makeEntry({ fontFamily: f, lineHeight: '1.5' })
+    );
+    const issues = auditTypographyTest(entries);
+    expect(issues.some(i => i.code === 'TOO_MANY_FAMILIES')).toBe(true);
+  });
+
+  it('auditTypography: missing lineHeight → MISSING_LINE_HEIGHT warning', () => {
+    const entries = [makeEntry({ lineHeight: '' })];
+    const issues = auditTypographyTest(entries);
+    expect(issues.some(i => i.code === 'MISSING_LINE_HEIGHT')).toBe(true);
+  });
+
+  it('auditTypography: font size 8px → TINY_TEXT error', () => {
+    const entries = [makeEntry({ fontSize: 8, lineHeight: '1.5' })];
+    const issues = auditTypographyTest(entries);
+    expect(issues.some(i => i.code === 'TINY_TEXT')).toBe(true);
+  });
+
+  it('auditTypography: off-grid size → OFF_GRID info', () => {
+    const entries = [makeEntry({ fontSize: 15, lineHeight: '1.5' })];
+    const issues = auditTypographyTest(entries);
+    expect(issues.some(i => i.code === 'OFF_GRID')).toBe(true);
+  });
+
+  it('auditTypography: empty entries → no issues', () => {
+    expect(auditTypographyTest([])).toHaveLength(0);
+  });
+});
