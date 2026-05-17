@@ -1,12 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
-import type { Shape } from '../../lib/shapes';
+import type { Shape, ComponentDef } from '../../lib/shapes';
 import type { Page } from '../../hooks/usePages';
 import type { LayerNode } from '../../hooks/useCanvas';
 import { LayerTree } from '../layers/LayerTree';
 import { HistoryPanel } from '../history/HistoryPanel';
+import { ComponentsPanel } from '../components/ComponentsPanel';
 
-export type LeftTab = 'layers' | 'pages' | 'history';
+export type LeftTab = 'layers' | 'pages' | 'history' | 'components';
 
 interface Props {
   // Panel visibility
@@ -36,12 +37,21 @@ interface Props {
   historyEntries: { label: string; index: number }[];
   historyIndex: number;
   onJumpHistory: (index: number) => void;
+
+  // Components
+  components: ComponentDef[];
+  canSaveComponent: boolean;
+  onInsertComponent: (componentId: string, x: number, y: number) => void;
+  onSaveSelectionAsComponent: (name: string) => void;
+  onDeleteComponent: (id: string) => void;
+  onRenameComponent: (id: string, name: string) => void;
 }
 
 const TABS: { id: LeftTab; label: string }[] = [
   { id: 'layers', label: 'Layers' },
   { id: 'pages', label: 'Pages' },
   { id: 'history', label: 'History' },
+  { id: 'components', label: 'Components' },
 ];
 
 export function LeftPanel({
@@ -65,6 +75,12 @@ export function LeftPanel({
   historyEntries,
   historyIndex,
   onJumpHistory,
+  components,
+  canSaveComponent,
+  onInsertComponent,
+  onSaveSelectionAsComponent,
+  onDeleteComponent,
+  onRenameComponent,
 }: Props) {
   if (collapsed) {
     return (
@@ -198,6 +214,17 @@ export function LeftPanel({
             onAdd={onAddPage}
             onRename={onRenamePage}
             onDelete={onDeletePage}
+          />
+        )}
+
+        {activeTab === 'components' && (
+          <ComponentsPanel
+            components={components}
+            onInsert={onInsertComponent}
+            onSaveSelection={onSaveSelectionAsComponent}
+            canSave={canSaveComponent}
+            onDelete={onDeleteComponent}
+            onRename={onRenameComponent}
           />
         )}
 

@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuid } from 'uuid';
-import type { Shape } from '../lib/shapes';
+import type { Shape, ComponentDef } from '../lib/shapes';
 import type { Page } from './usePages';
 import type { ChatMessage } from '@shared/types';
 
@@ -23,7 +23,10 @@ export interface ProjectData {
   pages: Page[];
   activePageId: string;
   chatHistory: ChatMessage[];
+  components: ComponentDef[];
 }
+
+export type { ComponentDef };
 
 interface StoreShape {
   version: 1;
@@ -41,6 +44,7 @@ function makeProject(name = 'Untitled Project'): ProjectData {
     pages: [{ id: pageId, name: 'Page 1', shapes: [] }],
     activePageId: pageId,
     chatHistory: [],
+    components: [],
   };
 }
 
@@ -105,6 +109,7 @@ export function useProjectStore() {
         ...p,
         pages: (p.pages ?? []).map(pg => ({ ...pg, shapes: pg.shapes ?? [] })),
         chatHistory: p.chatHistory ?? [],
+        components: p.components ?? [],
       }));
       const active = raw.activeProjectId && projects.find(p => p.id === raw.activeProjectId)
         ? raw.activeProjectId : projects[0].id;
@@ -127,6 +132,7 @@ export function useProjectStore() {
         ...p,
         pages: (p.pages ?? []).map(pg => ({ ...pg, shapes: pg.shapes ?? [] })),
         chatHistory: p.chatHistory ?? [],
+        components: p.components ?? [],
       }));
       // Validate activeProjectId
       const active = raw.activeProjectId && projects.find(p => p.id === raw.activeProjectId)
@@ -202,6 +208,20 @@ export function useProjectStore() {
     }));
   }, [update]);
 
+  const saveComponents = useCallback((
+    projectId: string,
+    components: ComponentDef[],
+  ) => {
+    update(s => ({
+      ...s,
+      projects: s.projects.map(p =>
+        p.id === projectId
+          ? { ...p, components, updatedAt: Date.now() }
+          : p
+      ),
+    }));
+  }, [update]);
+
   const activeProject = store?.projects.find(p => p.id === store.activeProjectId) ?? null;
 
   return {
@@ -214,6 +234,7 @@ export function useProjectStore() {
     renameProject,
     switchProject,
     saveProjectState,
+    saveComponents,
   };
 }
 

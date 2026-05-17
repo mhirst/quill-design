@@ -17,6 +17,7 @@ import { useSilentPatch } from './hooks/useSilentPatch';
 import { useDrawingTools } from './hooks/useDrawingTools';
 import { usePages } from './hooks/usePages';
 import { useProjectStore } from './hooks/useProjectStore';
+import { useComponents } from './hooks/useComponents';
 import { patchTailwindClass as patchTailwindClassLocal } from './lib/utils';
 import { defaultShape } from './lib/shapes';
 import type { Shape } from './lib/shapes';
@@ -71,6 +72,7 @@ function AppShell() {
           initialProject={store.activeProject}
           onSave={store.saveProjectState}
           onRename={store.renameProject}
+          onSaveComponents={store.saveComponents}
         />
       )}
     </div>
@@ -243,9 +245,10 @@ interface WorkspaceProps {
     chatHistory: ChatMessage[],
   ) => void;
   onRename: (projectId: string, name: string) => void;
+  onSaveComponents: (projectId: string, components: import('./lib/shapes').ComponentDef[]) => void;
 }
 
-function ProjectWorkspace({ projectId, initialProject, onSave, onRename }: WorkspaceProps) {
+function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveComponents }: WorkspaceProps) {
   const canvas = useCanvas();
   const fileManager = useFileManager();
   const [activeTool, setActiveTool] = useState<Tool>('cursor');
@@ -301,6 +304,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename }: Works
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Components / symbols
+  const componentLib = useComponents({
+    projectId,
+    components: initialProject.components ?? [],
+    onSave: onSaveComponents,
+  });
 
   // Chat — restore history from persisted data
   const [chatHistoryInit] = useState<ChatMessage[]>(() => initialProject.chatHistory ?? []);
@@ -667,6 +677,28 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename }: Works
         historyEntries={drawing.historyEntries}
         historyIndex={drawing.historyIndex}
         onJumpHistory={drawing.jumpToHistory}
+        components={componentLib.components}
+        canSaveComponent={
+          drawing.state.selectedIds.length >= 2 ||
+          (!!drawing.state.selectedId && !!drawing.state.shapes.find(s => s.id === drawing.state.selectedId && (s.isGroup || s.children.length > 0)))
+        }
+        onInsertComponent={(componentId, x, y) => {
+          const shapes = componentLib.insertInstance(componentId, x, y);
+          for (const s of shapes) drawingRef.current.addShape(s);
+          analytics.track('component_inserted', { componentId });
+        }}
+        onSaveSelectionAsComponent={(name) => {
+          const { selectedId, selectedIds, shapes } = drawingRef.current.state;
+          // Save the selected group, or auto-group a multi-selection first
+          const id = selectedId ?? (selectedIds.length > 0 ? selectedIds[0] : null);
+          if (!id) return;
+          const shape = shapes.find(s => s.id === id);
+          if (!shape) return;
+          componentLib.saveAsComponent(name, shape, shapes);
+          analytics.track('component_saved', { name });
+        }}
+        onDeleteComponent={componentLib.deleteComponent}
+        onRenameComponent={componentLib.renameComponent}
       />
 
       {/* Canvas + overlay + chat */}

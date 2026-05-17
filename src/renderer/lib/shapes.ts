@@ -18,6 +18,18 @@ export interface BezierPoint {
   cp2y?: number; // out-handle y
 }
 
+// ── Component definitions ──────────────────────────────────────────────────────
+
+export interface ComponentDef {
+  id: string;           // unique component id
+  name: string;
+  shapes: Shape[];      // master shape tree (group + children)
+  thumbnail?: string;   // base64 PNG for the components panel preview
+  createdAt: number;
+}
+
+// ── Gradient stops ─────────────────────────────────────────────────────────────
+
 export interface GradientStop {
   color: string;   // hex6, e.g. '#6366f1'
   position: number; // 0–1
@@ -73,6 +85,9 @@ export interface Shape {
   // Grouping
   isGroup?: boolean;  // true for shapes created via Ctrl+G
   parentId?: string;  // set on children when inside a group
+  // Components / symbols
+  componentId?: string;        // if set, this shape is master or an instance of that component
+  isMasterComponent?: boolean; // true for the canonical master group in ComponentDef
   // Path (type === 'path' only)
   points?: BezierPoint[];
   pathClosed?: boolean;
