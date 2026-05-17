@@ -151,6 +151,7 @@ import { DesignTokenMapper } from './components/canvas/DesignTokenMapper';
 import type { ShapeProperty } from './components/canvas/DesignTokenMapper';
 import { ImageFilterStudio } from './components/canvas/ImageFilterStudio';
 import { ShadowBuilderPanel } from './components/canvas/ShadowBuilderPanel';
+import { TypographyScaleInspector } from './components/canvas/TypographyScaleInspector';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -569,6 +570,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showTokenMapper, setShowTokenMapper] = useState(false);
   const [showFilterStudio, setShowFilterStudio] = useState(false);
   const [showShadowBuilder, setShowShadowBuilder] = useState(false);
+  const [showTypoScaleInspector, setShowTypoScaleInspector] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1147,8 +1149,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowTypographyAudit(v => !v); return; }
             break;
           }
-          // ── 8 — Shape Morpher ─────────────────────────────────────────────
+          // ── 8 — Typography Scale Inspector / Shape Morpher ───────────────
           case '8': {
+            if (e.shiftKey) { e.preventDefault(); setShowTypoScaleInspector(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowShapeMorph(v => !v); return; }
             break;
           }
@@ -3163,6 +3166,14 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
       <ShadowBuilderPanel
         open={showShadowBuilder}
         onClose={() => setShowShadowBuilder(false)}
+      />
+
+      {/* Typography Scale Inspector (⌘⇧8) */}
+      <TypographyScaleInspector
+        open={showTypoScaleInspector}
+        onClose={() => setShowTypoScaleInspector(false)}
+        selectedShapeFontSize={selectedShape?.fontSize}
+        onApplyFontSize={selectedShape ? (px) => drawingRef.current.updateShape(selectedShape.id, { fontSize: px }) : undefined}
       />
 
       {/* Design Token Mapper (⌘⌥U) */}

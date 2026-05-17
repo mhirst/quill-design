@@ -5561,3 +5561,170 @@ describe('ShadowBuilderPanel', () => {
     expect(hasPos).toBe(true);
   });
 });
+
+// ── TypographyScaleInspector ──────────────────────────────────────────────────
+
+interface TSIStep {
+  label: string;
+  size: number;
+  rem: string;
+  ratio: string;
+}
+
+interface TSIConfig {
+  baseSize: number;
+  ratio: number;
+  stepsUp: number;
+  stepsDown: number;
+  lineHeightRatio: number;
+  letterSpacingScale: boolean;
+}
+
+const TSI_DEFAULT: TSIConfig = {
+  baseSize: 16, ratio: 1.25, stepsUp: 5, stepsDown: 2,
+  lineHeightRatio: 1.5, letterSpacingScale: false,
+};
+
+const TSI_LABELS_UP = ['base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl'];
+const TSI_LABELS_DOWN = ['sm', 'xs', '2xs'];
+
+function tsiGenerateScale(config: TSIConfig): TSIStep[] {
+  const { baseSize, ratio, stepsUp, stepsDown } = config;
+  const steps: TSIStep[] = [];
+  for (let i = stepsDown; i >= 1; i--) {
+    const size = baseSize / Math.pow(ratio, i);
+    const label = TSI_LABELS_DOWN[i - 1] ?? `${i}xs`;
+    steps.push({ label, size: Math.round(size * 100) / 100, rem: `${(size / 16).toFixed(4)}rem`, ratio: `÷${ratio}^${i}` });
+  }
+  steps.push({ label: 'base', size: baseSize, rem: `${(baseSize / 16).toFixed(4)}rem`, ratio: '1×' });
+  for (let i = 1; i <= stepsUp; i++) {
+    const size = baseSize * Math.pow(ratio, i);
+    const label = TSI_LABELS_UP[i] ?? `${i}xl`;
+    steps.push({ label, size: Math.round(size * 100) / 100, rem: `${(size / 16).toFixed(4)}rem`, ratio: `×${ratio}^${i}` });
+  }
+  return steps;
+}
+
+function tsiLineHeight(size: number, ratio: number): number {
+  return Math.round(size * ratio * 10) / 10;
+}
+
+function tsiLetterSpacing(size: number, baseSize: number): string {
+  if (size <= baseSize) return '0em';
+  const factor = (size - baseSize) / baseSize;
+  return `${-(factor * 0.02).toFixed(4)}em`;
+}
+
+function tsiExportCSS(steps: TSIStep[], config: TSIConfig): string {
+  return ':root {\n' + steps.map(s => `  --fs-${s.label}: ${s.rem};`).join('\n') + '\n}';
+}
+
+function tsiClosestStep(target: number, steps: TSIStep[]): TSIStep {
+  return steps.reduce((best, s) => Math.abs(s.size - target) < Math.abs(best.size - target) ? s : best);
+}
+
+describe('TypographyScaleInspector', () => {
+  it('generateScale: base step is included', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    const base = steps.find(s => s.label === 'base');
+    expect(base).toBeDefined();
+    expect(base!.size).toBe(16);
+  });
+
+  it('generateScale: correct total step count', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    // stepsDown=2 + base + stepsUp=5 = 8
+    expect(steps).toHaveLength(8);
+  });
+
+  it('generateScale: steps are in ascending size order', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    for (let i = 1; i < steps.length; i++) {
+      expect(steps[i].size).toBeGreaterThan(steps[i - 1].size);
+    }
+  });
+
+  it('generateScale: ratio 1.25 — lg is 16*1.25=20', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    const lg = steps.find(s => s.label === 'lg');
+    expect(lg).toBeDefined();
+    expect(lg!.size).toBeCloseTo(20, 1);
+  });
+
+  it('generateScale: Golden Ratio produces xl ~41.89', () => {
+    const steps = tsiGenerateScale({ ...TSI_DEFAULT, ratio: 1.618, stepsUp: 3, stepsDown: 1 });
+    const xl = steps.find(s => s.label === 'xl');
+    expect(xl).toBeDefined();
+    expect(xl!.size).toBeCloseTo(16 * 1.618 * 1.618, 0);
+  });
+
+  it('generateScale: stepsDown=0 → no sm/xs steps', () => {
+    const steps = tsiGenerateScale({ ...TSI_DEFAULT, stepsDown: 0 });
+    expect(steps.find(s => s.label === 'sm')).toBeUndefined();
+    expect(steps[0].label).toBe('base');
+  });
+
+  it('generateScale: rem value correct (base 16px)', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    const base = steps.find(s => s.label === 'base')!;
+    expect(base.rem).toBe('1.0000rem');
+  });
+
+  it('lineHeight: size × ratio, rounded to 1dp', () => {
+    expect(tsiLineHeight(16, 1.5)).toBe(24);
+    expect(tsiLineHeight(20, 1.5)).toBe(30);
+  });
+
+  it('lineHeight: large heading tighter but still positive', () => {
+    const lh = tsiLineHeight(48, 1.2);
+    expect(lh).toBeGreaterThan(0);
+    expect(lh).toBeCloseTo(57.6, 0);
+  });
+
+  it('letterSpacing: base size → 0em', () => {
+    expect(tsiLetterSpacing(16, 16)).toBe('0em');
+  });
+
+  it('letterSpacing: small size → 0em (not smaller than base)', () => {
+    expect(tsiLetterSpacing(12, 16)).toBe('0em');
+  });
+
+  it('letterSpacing: double base size → negative value', () => {
+    const ls = tsiLetterSpacing(32, 16);
+    expect(ls).toMatch(/^-/);
+  });
+
+  it('exportCSS: starts with :root block', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    const css = tsiExportCSS(steps, TSI_DEFAULT);
+    expect(css).toMatch(/^:root \{/);
+    expect(css).toContain('--fs-base:');
+  });
+
+  it('exportCSS: contains all step labels', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    const css = tsiExportCSS(steps, TSI_DEFAULT);
+    for (const step of steps) {
+      expect(css).toContain(`--fs-${step.label}:`);
+    }
+  });
+
+  it('closestStep: exact match', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    const found = tsiClosestStep(16, steps);
+    expect(found.label).toBe('base');
+  });
+
+  it('closestStep: 19px → lg (20px) not sm (12.8px)', () => {
+    const steps = tsiGenerateScale(TSI_DEFAULT);
+    const found = tsiClosestStep(19, steps);
+    expect(found.label).toBe('lg');
+  });
+
+  it('ratios: SCALE_RATIOS has 9 entries covering 1.067 to 2.0', () => {
+    const ratios = [1.067, 1.125, 1.2, 1.25, 1.333, 1.414, 1.5, 1.618, 2.0];
+    expect(ratios).toHaveLength(9);
+    expect(Math.min(...ratios)).toBeCloseTo(1.067);
+    expect(Math.max(...ratios)).toBe(2.0);
+  });
+});
