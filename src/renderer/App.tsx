@@ -132,6 +132,7 @@ import { ComponentAnalyzerPanel } from './components/canvas/ComponentAnalyzerPan
 import { AnnotationOverlayPanel } from './components/canvas/AnnotationOverlayPanel';
 import { ZIndexVisualizerPanel } from './components/canvas/ZIndexVisualizerPanel';
 import { DesignMetricsPanel } from './components/canvas/DesignMetricsPanel';
+import { AttentionHeatmapPanel } from './components/canvas/AttentionHeatmapPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -533,6 +534,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showAnnotationOverlay, setShowAnnotationOverlay] = useState(false);
   const [showZIndexVisualizer, setShowZIndexVisualizer] = useState(false);
   const [showDesignMetrics, setShowDesignMetrics] = useState(false);
+  const [showAttentionHeatmap, setShowAttentionHeatmap] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -900,6 +902,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ⌘⇧⌥J = Layer Effects, ⌘⇧J = AI Quick Styles, ⌘J = Sticky note
           case 'j': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowLayerEffects(v => !v); return; }
+            if (e.altKey && !e.shiftKey) { e.preventDefault(); setShowAttentionHeatmap(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowAIQuickStyles(v => !v); return; }
             e.preventDefault(); startStickyNote(); showToast('Click canvas to place a sticky note', 'info'); return;
           }
@@ -2961,6 +2964,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showDesignMetrics}
         onClose={() => setShowDesignMetrics(false)}
         shapes={drawing.state.shapes}
+      />
+
+      {/* Attention Heatmap (⌘⌥J) */}
+      <AttentionHeatmapPanel
+        open={showAttentionHeatmap}
+        onClose={() => setShowAttentionHeatmap(false)}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}

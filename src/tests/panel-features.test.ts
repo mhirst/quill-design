@@ -3002,3 +3002,151 @@ describe('DesignMetricsPanel utilities', () => {
     expect(score).toBeLessThan(100);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AttentionHeatmapPanel — inlined utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface HeatPt { x: number; y: number; weight: number; }
+
+function binHeatPointsTest(
+  points: HeatPt[],
+  cols: number,
+  rows: number,
+  width: number,
+  height: number,
+): number[][] {
+  const grid: number[][] = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  for (const p of points) {
+    const col = Math.min(Math.floor(p.x / width * cols), cols - 1);
+    const row = Math.min(Math.floor(p.y / height * rows), rows - 1);
+    if (col >= 0 && row >= 0) grid[row][col] += p.weight;
+  }
+  return grid;
+}
+
+function findHottestCellTest(grid: number[][]): { row: number; col: number; value: number } {
+  let best = { row: 0, col: 0, value: 0 };
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      if (grid[r][c] > best.value) best = { row: r, col: c, value: grid[r][c] };
+    }
+  }
+  return best;
+}
+
+function computeCoverageTest(grid: number[][]): number {
+  if (grid.length === 0 || grid[0].length === 0) return 0;
+  const total = grid.length * grid[0].length;
+  return grid.flat().filter(v => v > 0).length / total;
+}
+
+function computeCentroidTest(points: HeatPt[]): { x: number; y: number } {
+  if (points.length === 0) return { x: 0, y: 0 };
+  let wx = 0, wy = 0, tw = 0;
+  for (const p of points) { wx += p.x * p.weight; wy += p.y * p.weight; tw += p.weight; }
+  return tw > 0 ? { x: wx / tw, y: wy / tw } : { x: 0, y: 0 };
+}
+
+function heatColorTest(t: number): string {
+  const r = Math.round(Math.min(t * 2, 1) * 255);
+  const g = Math.round(t < 0.5 ? t * 2 * 200 : (1 - (t - 0.5) * 2) * 200);
+  const b = Math.round(Math.max(0, (0.5 - t) * 2) * 255);
+  return `rgba(${r},${g},${b},0.75)`;
+}
+
+describe('AttentionHeatmapPanel utilities', () => {
+  // binHeatPoints
+  it('binHeatPoints: point at origin → cell [0][0]', () => {
+    const pts = [{ x: 10, y: 10, weight: 1 }];
+    const grid = binHeatPointsTest(pts, 10, 10, 1000, 1000);
+    expect(grid[0][0]).toBe(1);
+  });
+
+  it('binHeatPoints: point at center → center cell', () => {
+    const pts = [{ x: 500, y: 500, weight: 1 }];
+    const grid = binHeatPointsTest(pts, 10, 10, 1000, 1000);
+    expect(grid[5][5]).toBe(1);
+  });
+
+  it('binHeatPoints: multiple points accumulate', () => {
+    const pts = [
+      { x: 50, y: 50, weight: 1 },
+      { x: 50, y: 50, weight: 2 },
+    ];
+    const grid = binHeatPointsTest(pts, 10, 10, 1000, 1000);
+    expect(grid[0][0]).toBe(3);
+  });
+
+  it('binHeatPoints: empty points → zero grid', () => {
+    const grid = binHeatPointsTest([], 5, 5, 100, 100);
+    expect(grid.flat().every(v => v === 0)).toBe(true);
+  });
+
+  // findHottestCell
+  it('findHottestCell: finds max value cell', () => {
+    const grid = [[1, 0], [0, 5]];
+    const { row, col, value } = findHottestCellTest(grid);
+    expect(row).toBe(1);
+    expect(col).toBe(1);
+    expect(value).toBe(5);
+  });
+
+  it('findHottestCell: all zeros → value 0', () => {
+    const grid = [[0, 0], [0, 0]];
+    expect(findHottestCellTest(grid).value).toBe(0);
+  });
+
+  // computeCoverage
+  it('computeCoverage: empty grid → 0', () => {
+    expect(computeCoverageTest([])).toBe(0);
+  });
+
+  it('computeCoverage: all cells non-zero → 1', () => {
+    const grid = [[1, 2], [3, 4]];
+    expect(computeCoverageTest(grid)).toBe(1);
+  });
+
+  it('computeCoverage: half cells → 0.5', () => {
+    const grid = [[1, 0], [1, 0]];
+    expect(computeCoverageTest(grid)).toBe(0.5);
+  });
+
+  // computeCentroid
+  it('computeCentroid: single point → that point', () => {
+    const pts = [{ x: 100, y: 200, weight: 1 }];
+    const c = computeCentroidTest(pts);
+    expect(c.x).toBeCloseTo(100, 5);
+    expect(c.y).toBeCloseTo(200, 5);
+  });
+
+  it('computeCentroid: two equal-weight points → midpoint', () => {
+    const pts = [{ x: 0, y: 0, weight: 1 }, { x: 100, y: 100, weight: 1 }];
+    const c = computeCentroidTest(pts);
+    expect(c.x).toBeCloseTo(50, 5);
+    expect(c.y).toBeCloseTo(50, 5);
+  });
+
+  it('computeCentroid: empty → origin', () => {
+    expect(computeCentroidTest([])).toEqual({ x: 0, y: 0 });
+  });
+
+  // heatColor
+  it('heatColor: t=0 → blue', () => {
+    const c = heatColorTest(0);
+    expect(c).toContain('rgba(0,0,255');
+  });
+
+  it('heatColor: t=1 → red', () => {
+    const c = heatColorTest(1);
+    expect(c).toContain('rgba(255,0,0');
+  });
+
+  it('heatColor: t=0.5 → yellow-ish (r+g, no blue)', () => {
+    const c = heatColorTest(0.5);
+    const parts = c.match(/rgba\((\d+),(\d+),(\d+)/);
+    if (parts) {
+      expect(Number(parts[3])).toBe(0); // no blue at 0.5
+    }
+  });
+});
