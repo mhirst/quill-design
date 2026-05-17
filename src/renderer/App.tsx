@@ -157,6 +157,7 @@ import { GeometricProportionsPanel } from './components/canvas/GeometricProporti
 import { SpacingScalePanel } from './components/canvas/SpacingScalePanel';
 import { BorderRadiusStudio } from './components/canvas/BorderRadiusStudio';
 import { AdvancedAlignmentPanel } from './components/canvas/AdvancedAlignmentPanel';
+import { WCAGColorPairGenerator } from './components/canvas/WCAGColorPairGenerator';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -581,6 +582,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showSpacingScale, setShowSpacingScale] = useState(false);
   const [showBorderRadius, setShowBorderRadius] = useState(false);
   const [showAdvancedAlignment, setShowAdvancedAlignment] = useState(false);
+  const [showWCAGPairs, setShowWCAGPairs] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1157,8 +1159,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowColorTokens(v => !v); return; }
             break;
           }
-          // ── 7 — Typography Audit / Accessibility Auditor ──────────────────
+          // ── 7 — Typography Audit / Accessibility Auditor / WCAG Pairs ────
           case '7': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowWCAGPairs(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowA11yAudit(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowTypographyAudit(v => !v); return; }
             break;
@@ -3238,6 +3241,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             });
           }
         }}
+      />
+
+      {/* WCAG Color Pair Generator (⌘⇧⌥7) */}
+      <WCAGColorPairGenerator
+        open={showWCAGPairs}
+        onClose={() => setShowWCAGPairs(false)}
+        onPickForeground={selectedShape ? (hex) => drawingRef.current.updateShape(selectedShape.id, { fill: hex }) : undefined}
       />
 
       {/* Design Token Mapper (⌘⌥U) */}
