@@ -25,16 +25,20 @@ import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
 export default function App() {
-  const [apiKeyReady, setApiKeyReady] = useState<boolean | null>(null);
+  const [providerReady, setProviderReady] = useState<boolean | null>(null);
 
   useEffect(() => {
     const api = (window as unknown as Record<string, unknown>).api as typeof window.api | undefined;
-    if (!api) { setApiKeyReady(true); return; }
-    api.getApiKey().then(({ hasKey }) => setApiKeyReady(hasKey)).catch(() => setApiKeyReady(true));
+    if (!api) { setProviderReady(true); return; }
+    // Check new provider config first, fall back to legacy key check
+    const check = api.getProviderConfig
+      ? api.getProviderConfig().then(({ hasConfig }) => hasConfig)
+      : api.getApiKey().then(({ hasKey }) => hasKey);
+    check.then(setProviderReady).catch(() => setProviderReady(true));
   }, []);
 
-  if (apiKeyReady === null) return null;
-  if (!apiKeyReady) return <OnboardingScreen onComplete={() => setApiKeyReady(true)} />;
+  if (providerReady === null) return null;
+  if (!providerReady) return <OnboardingScreen onComplete={() => setProviderReady(true)} />;
   return <AppShell />;
 }
 

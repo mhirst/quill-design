@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 import { config } from 'dotenv';
 import { registerIpcHandlers } from './ipc-handlers';
-import { getApiKey } from './key-manager';
+import { initProviderConfig } from './key-manager';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -29,8 +29,9 @@ function loadEnv() {
 
 function createWindow() {
   loadEnv();
-  // Also load from key-manager store (persisted by user via onboarding)
-  getApiKey(); // side-effect: sets process.env.ANTHROPIC_API_KEY if stored
+  // Load provider config — migrates legacy Anthropic key if needed,
+  // and sets process.env.ANTHROPIC_API_KEY for the Anthropic SDK path
+  initProviderConfig();
 
   const iconPath = path.join(
     app.isPackaged ? process.resourcesPath : path.join(process.cwd(), 'assets'),

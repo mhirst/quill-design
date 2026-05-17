@@ -27,11 +27,16 @@ export const IPC = {
   PROJECT_GET_RECENTS: 'project:get-recents',
   PROJECT_ADD_RECENT: 'project:add-recent',
 
-  // API key management
+  // API key management (legacy — kept for migration)
   API_KEY_GET: 'apikey:get',
   API_KEY_SET: 'apikey:set',
   API_KEY_DELETE: 'apikey:delete',
   API_KEY_VALIDATE: 'apikey:validate',
+
+  // AI provider config
+  PROVIDER_GET: 'provider:get',
+  PROVIDER_SET: 'provider:set',
+  PROVIDER_VALIDATE: 'provider:validate',
 
   // App
   APP_GET_VERSION: 'app:get-version',

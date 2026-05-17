@@ -2,7 +2,8 @@ import { ipcMain, app, BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { IPC } from '../shared/ipc-channels';
-import { getApiKey, setApiKey, deleteApiKey, validateApiKey } from './key-manager';
+import { getApiKey, setApiKey, deleteApiKey, validateApiKey, getProviderConfig, setProviderConfig, deleteProviderConfig, validateProviderConfig } from './key-manager';
+import type { AIProviderConfig } from '../shared/types';
 import type {
   StreamStartPayload,
   FileWritePayload,
@@ -200,6 +201,21 @@ export function registerIpcHandlers(win: BrowserWindow): void {
 
   ipcMain.handle(IPC.API_KEY_VALIDATE, async (_e, { key }: { key: string }) => {
     return validateApiKey(key);
+  });
+
+  // ── AI provider config ─────────────────────────────────────────────────────
+  ipcMain.handle(IPC.PROVIDER_GET, () => {
+    const config = getProviderConfig();
+    return { config, hasConfig: !!config };
+  });
+
+  ipcMain.handle(IPC.PROVIDER_SET, (_e, config: AIProviderConfig) => {
+    setProviderConfig(config);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC.PROVIDER_VALIDATE, async (_e, config: AIProviderConfig) => {
+    return validateProviderConfig(config);
   });
 
   // ── App ────────────────────────────────────────────────────────────────────

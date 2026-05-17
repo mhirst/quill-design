@@ -13,14 +13,20 @@ import type {
   ProjectFolder,
   RecentProject,
   ProjectFileChangedPayload,
+  AIProviderConfig,
 } from '../shared/types';
 
 export type AppAPI = {
-  // API key
+  // API key (legacy — still used by onboarding for Anthropic flow)
   getApiKey: () => Promise<{ key: string | null; hasKey: boolean }>;
   setApiKey: (key: string) => Promise<{ success: boolean }>;
   deleteApiKey: () => Promise<{ success: boolean }>;
   validateApiKey: (key: string) => Promise<{ valid: boolean; error?: string }>;
+
+  // AI provider config
+  getProviderConfig: () => Promise<{ config: AIProviderConfig | null; hasConfig: boolean }>;
+  setProviderConfig: (config: AIProviderConfig) => Promise<{ success: boolean }>;
+  validateProviderConfig: (config: AIProviderConfig) => Promise<{ valid: boolean; error?: string }>;
 
   // File
   openFile: () => Promise<OpenFileResult | null>;
@@ -66,11 +72,16 @@ export type AppAPI = {
 };
 
 contextBridge.exposeInMainWorld('api', {
-  // API key
+  // API key (legacy)
   getApiKey: () => ipcRenderer.invoke(IPC.API_KEY_GET),
   setApiKey: (key: string) => ipcRenderer.invoke(IPC.API_KEY_SET, { key }),
   deleteApiKey: () => ipcRenderer.invoke(IPC.API_KEY_DELETE),
   validateApiKey: (key: string) => ipcRenderer.invoke(IPC.API_KEY_VALIDATE, { key }),
+
+  // AI provider config
+  getProviderConfig: () => ipcRenderer.invoke(IPC.PROVIDER_GET),
+  setProviderConfig: (config: AIProviderConfig) => ipcRenderer.invoke(IPC.PROVIDER_SET, config),
+  validateProviderConfig: (config: AIProviderConfig) => ipcRenderer.invoke(IPC.PROVIDER_VALIDATE, config),
 
   // File
   openFile: () => ipcRenderer.invoke(IPC.FILE_OPEN_DIALOG),

@@ -1,3 +1,42 @@
+// ── AI Provider config ────────────────────────────────────────────────────────
+
+export type AIProviderType =
+  | 'anthropic'       // Anthropic API (Claude)
+  | 'openai'          // OpenAI API
+  | 'lmstudio'        // LM Studio (local, OpenAI-compatible)
+  | 'ollama'          // Ollama (local, OpenAI-compatible)
+  | 'openai-compat';  // Any other OpenAI-compatible endpoint
+
+export interface AIProviderConfig {
+  provider: AIProviderType;
+  // API key — required for cloud providers, optional/unused for local
+  apiKey?: string;
+  // Base URL override — required for local providers, optional for cloud
+  // e.g. "http://localhost:1234/v1" for LM Studio
+  baseUrl?: string;
+  // Model name to use
+  // e.g. "claude-sonnet-4-6", "gpt-4o", "llama-3.2-3b-instruct"
+  model?: string;
+}
+
+export const PROVIDER_DEFAULTS: Record<AIProviderType, Partial<AIProviderConfig>> = {
+  anthropic:    { baseUrl: 'https://api.anthropic.com', model: 'claude-sonnet-4-6' },
+  openai:       { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' },
+  lmstudio:     { baseUrl: 'http://localhost:1234/v1',  model: 'local-model' },
+  ollama:       { baseUrl: 'http://localhost:11434/v1', model: 'llama3.2' },
+  'openai-compat': { baseUrl: 'http://localhost:8080/v1', model: 'local-model' },
+};
+
+export const PROVIDER_LABELS: Record<AIProviderType, string> = {
+  anthropic:       'Anthropic (Claude)',
+  openai:          'OpenAI',
+  lmstudio:        'LM Studio (local)',
+  ollama:          'Ollama (local)',
+  'openai-compat': 'Custom OpenAI-compatible',
+};
+
+// ── Element selection ─────────────────────────────────────────────────────────
+
 export interface ElementSelection {
   tagName: string;
   id: string | null;
