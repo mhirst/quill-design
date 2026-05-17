@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef, type ReactNode, type CSSProperties } from 'react';
-import type { Shape } from '../../lib/shapes';
+import type { Shape, GradientStop } from '../../lib/shapes';
 import { normalizeRadius } from '../../lib/shapes';
+import { GradientEditor } from './GradientEditor';
 import { GOOGLE_FONTS, SYSTEM_FONTS, CATEGORY_LABELS, type GoogleFont } from '../../lib/googleFonts';
 import { loadGoogleFont } from '../../hooks/useFontLoader';
 
@@ -139,24 +140,72 @@ function TypeBadge({ type }: { type: Shape['type'] }) {
 
 // ── Fill section ───────────────────────────────────────────────────────────
 
+type FillType = 'solid' | 'linear-gradient' | 'radial-gradient';
+
 function FillSection({ shape, onPreview, onChange }: { shape: Shape; onPreview: (p: Partial<Shape>) => void; onChange: (p: Partial<Shape>) => void }) {
-  const hasFill = shape.fill !== 'transparent';
+  const fillType: FillType = (shape.fillType as FillType) ?? 'solid';
+  const hasFill = fillType !== 'solid' || shape.fill !== 'transparent';
+  const stops: GradientStop[] = shape.gradientStops ?? [{ color: '#6366f1', position: 0 }, { color: '#a855f7', position: 1 }];
+  const angle = shape.gradientAngle ?? 135;
+
+  const FILL_TYPES: { id: FillType; label: string; title: string }[] = [
+    { id: 'solid', label: '■', title: 'Solid' },
+    { id: 'linear-gradient', label: '▦', title: 'Linear gradient' },
+    { id: 'radial-gradient', label: '◎', title: 'Radial gradient' },
+  ];
 
   return (
     <CollapsibleSection
       label="Fill"
-      onAdd={!hasFill ? () => { onPreview({ fill: '#e2e8f0' }); onChange({ fill: '#e2e8f0' }); } : undefined}
-      onRemove={hasFill ? () => { onPreview({ fill: 'transparent' }); onChange({ fill: 'transparent' }); } : undefined}
+      onAdd={!hasFill ? () => { onPreview({ fill: '#e2e8f0', fillType: 'solid' }); onChange({ fill: '#e2e8f0', fillType: 'solid' }); } : undefined}
+      onRemove={hasFill ? () => { onPreview({ fill: 'transparent', fillType: 'solid' }); onChange({ fill: 'transparent', fillType: 'solid' }); } : undefined}
     >
       {hasFill && (
-        <ColorRow
-          color={shape.fill}
-          opacity={Math.round(shape.fillOpacity * 100)}
-          onColorPreview={(v) => onPreview({ fill: v })}
-          onColorCommit={(v) => onChange({ fill: v })}
-          onOpacityPreview={(v) => onPreview({ fillOpacity: v / 100 })}
-          onOpacityCommit={(v) => onChange({ fillOpacity: v / 100 })}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Fill type toggle */}
+          <div style={{ display: 'flex', gap: 2, background: 'var(--panel-alt)', borderRadius: 6, padding: 2 }}>
+            {FILL_TYPES.map(ft => (
+              <button
+                key={ft.id}
+                title={ft.title}
+                onClick={() => { onPreview({ fillType: ft.id }); onChange({ fillType: ft.id }); }}
+                style={{
+                  flex: 1, height: 22, borderRadius: 4, border: 'none', cursor: 'pointer',
+                  background: fillType === ft.id ? 'var(--panel)' : 'none',
+                  color: fillType === ft.id ? 'var(--text)' : 'var(--muted)',
+                  fontSize: 13, fontWeight: fillType === ft.id ? 700 : 400,
+                  boxShadow: fillType === ft.id ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
+                  transition: 'all 0.1s',
+                }}
+              >
+                {ft.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Solid: colour picker */}
+          {fillType === 'solid' && (
+            <ColorRow
+              color={shape.fill}
+              opacity={Math.round(shape.fillOpacity * 100)}
+              onColorPreview={(v) => onPreview({ fill: v })}
+              onColorCommit={(v) => onChange({ fill: v })}
+              onOpacityPreview={(v) => onPreview({ fillOpacity: v / 100 })}
+              onOpacityCommit={(v) => onChange({ fillOpacity: v / 100 })}
+            />
+          )}
+
+          {/* Gradient editor */}
+          {(fillType === 'linear-gradient' || fillType === 'radial-gradient') && (
+            <GradientEditor
+              type={fillType}
+              stops={stops}
+              angle={angle}
+              onPreview={(s, a) => onPreview({ gradientStops: s, gradientAngle: a })}
+              onChange={(s, a) => onChange({ gradientStops: s, gradientAngle: a })}
+            />
+          )}
+        </div>
       )}
     </CollapsibleSection>
   );

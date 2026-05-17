@@ -18,6 +18,11 @@ export interface BezierPoint {
   cp2y?: number; // out-handle y
 }
 
+export interface GradientStop {
+  color: string;   // hex6, e.g. '#6366f1'
+  position: number; // 0–1
+}
+
 export interface Shape {
   id: string;
   type: ShapeType;
@@ -29,6 +34,9 @@ export interface Shape {
   // Appearance
   fill: string;
   fillOpacity: number;
+  fillType: 'solid' | 'linear-gradient' | 'radial-gradient';
+  gradientStops: GradientStop[];
+  gradientAngle: number; // degrees (linear only)
   stroke: string;
   strokeWidth: number;
   /** Uniform radius (number) or per-corner [TL, TR, BR, BL] tuple. 9999 = circle (ellipse). */
@@ -88,6 +96,9 @@ export function defaultShape(type: ShapeType, id: string): Shape {
     rotation: 0,
     fill: type === 'frame' ? 'transparent' : '#e2e8f0',
     fillOpacity: 1,
+    fillType: 'solid',
+    gradientStops: [{ color: '#6366f1', position: 0 }, { color: '#a855f7', position: 1 }],
+    gradientAngle: 135,
     stroke: type === 'frame' ? '#6366f1' : 'transparent',
     strokeWidth: type === 'frame' ? 1 : 0,
     borderRadius: 0,
@@ -243,7 +254,15 @@ export function buildShapeStyle(s: Shape): React.CSSProperties {
     style.transform = `rotate(${s.rotation}deg)`;
   }
 
-  if (s.fill !== 'transparent') {
+  const fillType = s.fillType ?? 'solid';
+  if (fillType === 'linear-gradient' || fillType === 'radial-gradient') {
+    const stops = (s.gradientStops ?? []).map(st => `${st.color} ${(st.position * 100).toFixed(1)}%`).join(', ');
+    if (fillType === 'linear-gradient') {
+      style.backgroundImage = `linear-gradient(${s.gradientAngle ?? 135}deg, ${stops})`;
+    } else {
+      style.backgroundImage = `radial-gradient(circle, ${stops})`;
+    }
+  } else if (s.fill !== 'transparent') {
     // Encode fillOpacity into the color alpha channel so it doesn't affect stroke/children
     if (s.fillOpacity < 1 && /^#[0-9a-fA-F]{6}$/.test(s.fill)) {
       const alpha = Math.round(s.fillOpacity * 255).toString(16).padStart(2, '0');
@@ -586,7 +605,25 @@ export function shapesToCanvas(shapes: Shape[], canvas: HTMLCanvasElement): void
     }
 
     // Fill
-    if (s.fill !== 'transparent') {
+    const shapeFillType = s.fillType ?? 'solid';
+    if (shapeFillType === 'linear-gradient' || shapeFillType === 'radial-gradient') {
+      const stops = s.gradientStops ?? [];
+      let grad: CanvasGradient;
+      if (shapeFillType === 'linear-gradient') {
+        const angle = ((s.gradientAngle ?? 135) * Math.PI) / 180;
+        const halfDiag = Math.sqrt(s.width * s.width + s.height * s.height) / 2;
+        const cx2 = sx + s.width / 2, cy2 = sy + s.height / 2;
+        grad = ctx.createLinearGradient(
+          cx2 - Math.cos(angle) * halfDiag, cy2 - Math.sin(angle) * halfDiag,
+          cx2 + Math.cos(angle) * halfDiag, cy2 + Math.sin(angle) * halfDiag,
+        );
+      } else {
+        grad = ctx.createRadialGradient(sx + s.width / 2, sy + s.height / 2, 0, sx + s.width / 2, sy + s.height / 2, Math.max(s.width, s.height) / 2);
+      }
+      for (const st of stops) grad.addColorStop(Math.max(0, Math.min(1, st.position)), st.color);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    } else if (s.fill !== 'transparent') {
       if (s.fillOpacity < 1 && /^#[0-9a-fA-F]{6}$/.test(s.fill)) {
         const alpha = Math.round(s.fillOpacity * 255).toString(16).padStart(2, '0');
         ctx.fillStyle = s.fill + alpha;
