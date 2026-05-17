@@ -4208,3 +4208,89 @@ describe('ShapeTimelinePanel utilities', () => {
     expect(tlTotalDuration([])).toBe(0);
   });
 });
+
+// ── SVGPatternLibrary ──────────────────────────────────────────────────────────
+
+// Inlined utilities from SVGPatternLibrary.tsx
+
+function svgEscapeAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function svgToDataURI(svg: string): string {
+  return `data:image/svg+xml,${encodeURIComponent(svg.trim())}`;
+}
+
+function svgPatternLabel(type: string): string {
+  const labels: Record<string, string> = {
+    dots: 'Dots', grid: 'Grid', 'lines-h': 'H Lines', 'lines-v': 'V Lines',
+    'lines-diagonal': 'Diagonal', crosshatch: 'Crosshatch', chevron: 'Chevron',
+    triangles: 'Triangles', hexagons: 'Hexagons', diamonds: 'Diamonds', waves: 'Waves',
+    herringbone: 'Herringbone', bricks: 'Bricks', isometric: 'Isometric', circles: 'Circles',
+    squares: 'Squares', plus: 'Plus', zigzag: 'Zigzag', polka: 'Polka', confetti: 'Confetti',
+  };
+  return labels[type] ?? type;
+}
+
+const SVG_ALL_TYPES = ['dots', 'grid', 'lines-h', 'lines-v', 'lines-diagonal', 'crosshatch', 'chevron', 'triangles', 'hexagons', 'diamonds', 'waves', 'herringbone', 'bricks', 'isometric', 'circles', 'squares', 'plus', 'zigzag', 'polka', 'confetti'];
+
+describe('SVGPatternLibrary utilities', () => {
+  // escapeSVGAttr
+  it('escapeSVGAttr: escapes ampersand', () => {
+    expect(svgEscapeAttr('a&b')).toBe('a&amp;b');
+  });
+
+  it('escapeSVGAttr: escapes quotes', () => {
+    expect(svgEscapeAttr('"test"')).toBe('&quot;test&quot;');
+  });
+
+  it('escapeSVGAttr: escapes angle brackets', () => {
+    expect(svgEscapeAttr('<b>')).toBe('&lt;b&gt;');
+  });
+
+  it('escapeSVGAttr: passthrough for safe strings', () => {
+    expect(svgEscapeAttr('#ff0000')).toBe('#ff0000');
+  });
+
+  // svgToDataURI
+  it('svgToDataURI: starts with data:image/svg+xml,', () => {
+    const uri = svgToDataURI('<svg/>');
+    expect(uri).toMatch(/^data:image\/svg\+xml,/);
+  });
+
+  it('svgToDataURI: encodes angle brackets', () => {
+    const uri = svgToDataURI('<svg/>');
+    expect(uri).not.toContain('<svg/>');
+  });
+
+  // patternLabel
+  it('patternLabel: dots → "Dots"', () => {
+    expect(svgPatternLabel('dots')).toBe('Dots');
+  });
+
+  it('patternLabel: crosshatch → "Crosshatch"', () => {
+    expect(svgPatternLabel('crosshatch')).toBe('Crosshatch');
+  });
+
+  it('patternLabel: unknown → unchanged', () => {
+    expect(svgPatternLabel('foobar')).toBe('foobar');
+  });
+
+  // Pattern count
+  it('ALL_PATTERN_TYPES has 20 patterns', () => {
+    expect(SVG_ALL_TYPES.length).toBe(20);
+  });
+
+  it('ALL_PATTERN_TYPES includes all key patterns', () => {
+    expect(SVG_ALL_TYPES).toContain('hexagons');
+    expect(SVG_ALL_TYPES).toContain('isometric');
+    expect(SVG_ALL_TYPES).toContain('confetti');
+  });
+
+  // Pattern labels coverage
+  it('all pattern types have labels', () => {
+    for (const t of SVG_ALL_TYPES) {
+      expect(svgPatternLabel(t)).not.toBe(t); // all have custom labels
+    }
+  });
+});

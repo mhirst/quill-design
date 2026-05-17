@@ -139,6 +139,7 @@ import { BlendModesPanel } from './components/canvas/BlendModesPanel';
 import { SnapGuideManagerPanel } from './components/canvas/SnapGuideManagerPanel';
 import { DesignSystemHealthPanel } from './components/canvas/DesignSystemHealthPanel';
 import { ShapeTimelinePanel } from './components/canvas/ShapeTimelinePanel';
+import { SVGPatternLibrary } from './components/canvas/SVGPatternLibrary';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -547,6 +548,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showSnapGuideManager, setShowSnapGuideManager] = useState(false);
   const [showDesignSystemHealth, setShowDesignSystemHealth] = useState(false);
   const [showShapeTimeline, setShowShapeTimeline] = useState(false);
+  const [showSVGPatterns, setShowSVGPatterns] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -951,9 +953,10 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { setShowNoiseTexture(v => !v); return; }
             handleNewDocRef.current(); return;
           }
-          // ── o — Color scheme ──────────────────────────────────────────────
+          // ── o — Color scheme / SVG Patterns ──────────────────────────────
           case 'o': {
             if (e.shiftKey) { e.preventDefault(); setShowColorScheme(o => !o); return; }
+            if (e.altKey) { e.preventDefault(); setShowSVGPatterns(v => !v); return; }
             break;
           }
           // ── p — Theme customizer / Presence / Prototype / Path Inspector ──
@@ -3054,6 +3057,20 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showShapeTimeline}
         onClose={() => setShowShapeTimeline(false)}
         shapes={drawing.state.shapes}
+      />
+
+      {/* SVG Pattern Library (⌘⌥O) */}
+      <SVGPatternLibrary
+        open={showSVGPatterns}
+        onClose={() => setShowSVGPatterns(false)}
+        selectedShape={selectedShape}
+        onApplyToShape={(patch) => {
+          const id = drawing.state.selectedId;
+          if (id) {
+            drawingRef.current.updateShape(id, patch);
+            showToast('Pattern applied', 'action');
+          }
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
