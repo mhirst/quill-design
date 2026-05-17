@@ -4744,3 +4744,138 @@ describe('IconSearchPanel', () => {
     }
   });
 });
+
+// ── CSSGridVisualizerPanel ────────────────────────────────────────────────────
+
+function gvParseTrack(template: string, containerSize: number): Array<{ value: string; pixels: number }> {
+  if (!template.trim()) return [];
+  const expanded = template.replace(/repeat\((\d+),\s*([^)]+)\)/g, (_: string, count: string, value: string) => {
+    return Array(parseInt(count)).fill(value.trim()).join(' ');
+  });
+  const tokens = expanded.split(/\s+/).filter(Boolean);
+  const totalFr = tokens.reduce((sum: number, t: string) => sum + (t.endsWith('fr') ? parseFloat(t) : 0), 0);
+  const fixedTotal = tokens.reduce((sum: number, t: string) => {
+    if (t.endsWith('px')) return sum + parseFloat(t);
+    if (t.endsWith('%')) return sum + (parseFloat(t) / 100) * containerSize;
+    return sum;
+  }, 0);
+  const frUnit = totalFr > 0 ? (containerSize - fixedTotal) / totalFr : 0;
+  return tokens.map((token: string) => {
+    let px = 0;
+    if (token.endsWith('fr')) px = parseFloat(token) * frUnit;
+    else if (token.endsWith('px')) px = parseFloat(token);
+    else if (token.endsWith('%')) px = (parseFloat(token) / 100) * containerSize;
+    return { value: token, pixels: Math.max(0, px) };
+  });
+}
+
+function gvGridCSS(templateColumns: string, columnGap: number, rowGap: number, padding: number): string {
+  const lines: string[] = ['.container {', '  display: grid;'];
+  if (templateColumns) lines.push(`  grid-template-columns: ${templateColumns};`);
+  if (columnGap > 0) lines.push(`  column-gap: ${columnGap}px;`);
+  if (rowGap > 0) lines.push(`  row-gap: ${rowGap}px;`);
+  if (padding > 0) lines.push(`  padding: ${padding}px;`);
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function gvFlexCSS(direction: string, wrap: string, justifyContent: string, gap: number): string {
+  const lines: string[] = ['.container {', '  display: flex;'];
+  if (direction !== 'row') lines.push(`  flex-direction: ${direction};`);
+  if (wrap !== 'nowrap') lines.push(`  flex-wrap: ${wrap};`);
+  if (justifyContent !== 'flex-start') lines.push(`  justify-content: ${justifyContent};`);
+  if (gap > 0) lines.push(`  gap: ${gap}px;`);
+  lines.push('}');
+  return lines.join('\n');
+}
+
+describe('CSSGridVisualizerPanel', () => {
+  it('parseTrackList: 3 equal fr columns', () => {
+    const tracks = gvParseTrack('repeat(3, 1fr)', 900);
+    expect(tracks).toHaveLength(3);
+    expect(tracks[0].pixels).toBeCloseTo(300, 0);
+  });
+
+  it('parseTrackList: mixed px and fr', () => {
+    const tracks = gvParseTrack('200px 1fr', 800);
+    expect(tracks).toHaveLength(2);
+    expect(tracks[0].pixels).toBe(200);
+    expect(tracks[1].pixels).toBe(600);
+  });
+
+  it('parseTrackList: percentage track', () => {
+    const tracks = gvParseTrack('50%', 400);
+    expect(tracks[0].pixels).toBe(200);
+  });
+
+  it('parseTrackList: empty template returns empty array', () => {
+    expect(gvParseTrack('', 1000)).toHaveLength(0);
+  });
+
+  it('parseTrackList: repeat(12, 1fr) expands to 12 tracks', () => {
+    const tracks = gvParseTrack('repeat(12, 1fr)', 1200);
+    expect(tracks).toHaveLength(12);
+    expect(tracks[0].pixels).toBe(100);
+  });
+
+  it('parseTrackList: px track parses correctly', () => {
+    const tracks = gvParseTrack('100px 200px', 1000);
+    expect(tracks[0].pixels).toBe(100);
+    expect(tracks[1].pixels).toBe(200);
+  });
+
+  it('generateGridCSS: includes display grid', () => {
+    const css = gvGridCSS('1fr 1fr', 16, 8, 0);
+    expect(css).toContain('display: grid');
+  });
+
+  it('generateGridCSS: includes template columns', () => {
+    const css = gvGridCSS('repeat(3, 1fr)', 16, 0, 0);
+    expect(css).toContain('grid-template-columns: repeat(3, 1fr)');
+  });
+
+  it('generateGridCSS: includes column-gap when > 0', () => {
+    const css = gvGridCSS('1fr', 24, 0, 0);
+    expect(css).toContain('column-gap: 24px');
+  });
+
+  it('generateGridCSS: omits row-gap when 0', () => {
+    const css = gvGridCSS('1fr', 16, 0, 0);
+    expect(css).not.toContain('row-gap');
+  });
+
+  it('generateGridCSS: includes padding when > 0', () => {
+    const css = gvGridCSS('1fr', 0, 0, 20);
+    expect(css).toContain('padding: 20px');
+  });
+
+  it('generateFlexCSS: includes display flex', () => {
+    const css = gvFlexCSS('row', 'nowrap', 'flex-start', 0);
+    expect(css).toContain('display: flex');
+  });
+
+  it('generateFlexCSS: omits direction when row (default)', () => {
+    const css = gvFlexCSS('row', 'nowrap', 'flex-start', 0);
+    expect(css).not.toContain('flex-direction');
+  });
+
+  it('generateFlexCSS: includes direction when column', () => {
+    const css = gvFlexCSS('column', 'nowrap', 'flex-start', 0);
+    expect(css).toContain('flex-direction: column');
+  });
+
+  it('generateFlexCSS: includes justify-content when not default', () => {
+    const css = gvFlexCSS('row', 'nowrap', 'space-between', 0);
+    expect(css).toContain('justify-content: space-between');
+  });
+
+  it('generateFlexCSS: includes gap when > 0', () => {
+    const css = gvFlexCSS('row', 'wrap', 'flex-start', 16);
+    expect(css).toContain('gap: 16px');
+  });
+
+  it('generateFlexCSS: includes flex-wrap when wrap', () => {
+    const css = gvFlexCSS('row', 'wrap', 'flex-start', 0);
+    expect(css).toContain('flex-wrap: wrap');
+  });
+});

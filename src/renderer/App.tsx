@@ -144,6 +144,7 @@ import { SpacingTokenInspector } from './components/canvas/SpacingTokenInspector
 import { ColorPaletteExtractor } from './components/canvas/ColorPaletteExtractor';
 import { IconSearchPanel } from './components/canvas/IconSearchPanel';
 import type { IconDef } from './components/canvas/IconSearchPanel';
+import { CSSGridVisualizerPanel } from './components/canvas/CSSGridVisualizerPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -556,6 +557,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showSpacingTokens, setShowSpacingTokens] = useState(false);
   const [showColorPalette, setShowColorPalette] = useState(false);
   const [showIconSearch, setShowIconSearch] = useState(false);
+  const [showCSSGrid, setShowCSSGrid] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1122,6 +1124,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }
           // ── 6 — Color Tokens ──────────────────────────────────────────────
           case '6': {
+            if (e.shiftKey) { e.preventDefault(); setShowCSSGrid(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowColorTokens(v => !v); return; }
             break;
           }
@@ -3112,6 +3115,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           shape.stroke = color;
           drawingRef.current.addShape(shape);
         }}
+      />
+
+      {/* CSS Grid Visualizer (⌘⇧6) */}
+      <CSSGridVisualizerPanel
+        open={showCSSGrid}
+        onClose={() => setShowCSSGrid(false)}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
