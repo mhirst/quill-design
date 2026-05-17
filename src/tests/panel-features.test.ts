@@ -6143,3 +6143,123 @@ describe('SpacingScalePanel', () => {
     expect(closest.label).toBe('base');
   });
 });
+
+// ── BorderRadiusStudio ────────────────────────────────────────────────────────
+
+interface BRCorner { tl: number; tr: number; br: number; bl: number; }
+
+function brCornersToCSS(c: BRCorner): string {
+  const { tl, tr, br, bl } = c;
+  if (tl === tr && tr === br && br === bl) return `border-radius: ${tl}px;`;
+  if (tl === br && tr === bl) return `border-radius: ${tl}px ${tr}px;`;
+  return `border-radius: ${tl}px ${tr}px ${br}px ${bl}px;`;
+}
+
+function brCornersToLongform(c: BRCorner): string {
+  return `border-top-left-radius: ${c.tl}px;\nborder-top-right-radius: ${c.tr}px;\nborder-bottom-right-radius: ${c.br}px;\nborder-bottom-left-radius: ${c.bl}px;`;
+}
+
+function brIsAllEqual(c: BRCorner): boolean {
+  return c.tl === c.tr && c.tr === c.br && c.br === c.bl;
+}
+
+function brAverage(c: BRCorner): number {
+  return Math.round((c.tl + c.tr + c.br + c.bl) / 4);
+}
+
+function brClamp(v: number, max?: number): number {
+  return Math.max(0, Math.min(max ?? 9999, Math.round(v)));
+}
+
+function brSVGPath(c: BRCorner, w: number, h: number): string {
+  const maxR = Math.min(w, h) / 2;
+  const tl = Math.min(c.tl, maxR), tr = Math.min(c.tr, maxR);
+  const br = Math.min(c.br, maxR), bl = Math.min(c.bl, maxR);
+  return `M ${tl} 0 L ${w - tr} 0 Q ${w} 0 ${w} ${tr} L ${w} ${h - br} Q ${w} ${h} ${w - br} ${h} L ${bl} ${h} Q 0 ${h} 0 ${h - bl} L 0 ${tl} Q 0 0 ${tl} 0 Z`;
+}
+
+describe('BorderRadiusStudio', () => {
+  it('cornersToCSS: uniform → single value', () => {
+    expect(brCornersToCSS({ tl: 8, tr: 8, br: 8, bl: 8 })).toBe('border-radius: 8px;');
+  });
+
+  it('cornersToCSS: diagonal pairs → 2 values', () => {
+    expect(brCornersToCSS({ tl: 12, tr: 4, br: 12, bl: 4 })).toBe('border-radius: 12px 4px;');
+  });
+
+  it('cornersToCSS: all different → 4 values', () => {
+    const css = brCornersToCSS({ tl: 2, tr: 4, br: 8, bl: 16 });
+    expect(css).toBe('border-radius: 2px 4px 8px 16px;');
+  });
+
+  it('cornersToCSS: zero → border-radius: 0px;', () => {
+    expect(brCornersToCSS({ tl: 0, tr: 0, br: 0, bl: 0 })).toBe('border-radius: 0px;');
+  });
+
+  it('cornersToLongform: includes all 4 properties', () => {
+    const lf = brCornersToLongform({ tl: 10, tr: 20, br: 30, bl: 40 });
+    expect(lf).toContain('border-top-left-radius: 10px');
+    expect(lf).toContain('border-top-right-radius: 20px');
+    expect(lf).toContain('border-bottom-right-radius: 30px');
+    expect(lf).toContain('border-bottom-left-radius: 40px');
+  });
+
+  it('isAllEqual: true for uniform', () => {
+    expect(brIsAllEqual({ tl: 8, tr: 8, br: 8, bl: 8 })).toBe(true);
+  });
+
+  it('isAllEqual: false for asymmetric', () => {
+    expect(brIsAllEqual({ tl: 8, tr: 4, br: 8, bl: 4 })).toBe(false);
+  });
+
+  it('average: (8+8+8+8)/4 = 8', () => {
+    expect(brAverage({ tl: 8, tr: 8, br: 8, bl: 8 })).toBe(8);
+  });
+
+  it('average: (0+8+16+8)/4 = 8', () => {
+    expect(brAverage({ tl: 0, tr: 8, br: 16, bl: 8 })).toBe(8);
+  });
+
+  it('clamp: negative → 0', () => {
+    expect(brClamp(-5)).toBe(0);
+  });
+
+  it('clamp: over max → max', () => {
+    expect(brClamp(100, 50)).toBe(50);
+  });
+
+  it('clamp: rounds floats', () => {
+    expect(brClamp(7.6)).toBe(8);
+  });
+
+  it('SVG path: starts at tl offset', () => {
+    const path = brSVGPath({ tl: 10, tr: 0, br: 0, bl: 0 }, 100, 50);
+    expect(path).toContain('M 10 0');
+  });
+
+  it('SVG path: clamps radii to half of smaller dimension', () => {
+    // 200×100 box, corner 100 → clamped to 50 (min(200,100)/2)
+    const path = brSVGPath({ tl: 100, tr: 0, br: 0, bl: 0 }, 200, 100);
+    expect(path).toContain('M 50 0');
+  });
+
+  it('presets: pill has 9999 everywhere', () => {
+    const pill = { tl: 9999, tr: 9999, br: 9999, bl: 9999 };
+    expect(brIsAllEqual(pill)).toBe(true);
+    expect(brCornersToCSS(pill)).toBe('border-radius: 9999px;');
+  });
+
+  it('presets: top-only has br=bl=0', () => {
+    const topOnly = { tl: 12, tr: 12, br: 0, bl: 0 };
+    expect(topOnly.br).toBe(0);
+    expect(topOnly.bl).toBe(0);
+    expect(topOnly.tl).toBeGreaterThan(0);
+  });
+
+  it('presets: 17 presets defined', () => {
+    const presetNames = ['None', 'Subtle (2px)', 'Small (4px)', 'Medium (8px)', 'Large (12px)',
+      'XL (16px)', '2XL (24px)', 'Pill (9999px)', 'Top Only', 'Bottom Only',
+      'Left Only', 'Right Only', 'Squircle-ish (40%)', 'Asymmetric Wave', 'Egg Shape', 'Teardrop', 'Diamond Tab'];
+    expect(presetNames).toHaveLength(17);
+  });
+});

@@ -155,6 +155,7 @@ import { TypographyScaleInspector } from './components/canvas/TypographyScaleIns
 import { ColorMixingPanel } from './components/canvas/ColorMixingPanel';
 import { GeometricProportionsPanel } from './components/canvas/GeometricProportionsPanel';
 import { SpacingScalePanel } from './components/canvas/SpacingScalePanel';
+import { BorderRadiusStudio } from './components/canvas/BorderRadiusStudio';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -577,6 +578,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showColorMixing, setShowColorMixing] = useState(false);
   const [showGeometricProps, setShowGeometricProps] = useState(false);
   const [showSpacingScale, setShowSpacingScale] = useState(false);
+  const [showBorderRadius, setShowBorderRadius] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1139,8 +1141,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowHandoffSpec(v => !v); return; }
             break;
           }
-          // ── 5 — Geometry Calculator ───────────────────────────────────────
+          // ── 5 — Geometry Calculator / Color Palette / Border Radius ─────
           case '5': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowBorderRadius(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowColorPalette(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowGeometry(v => !v); return; }
             break;
@@ -3203,6 +3206,14 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
       <SpacingScalePanel
         open={showSpacingScale}
         onClose={() => setShowSpacingScale(false)}
+      />
+
+      {/* Border Radius Studio (⌘⇧⌥5) */}
+      <BorderRadiusStudio
+        open={showBorderRadius}
+        onClose={() => setShowBorderRadius(false)}
+        initialRadius={typeof selectedShape?.borderRadius === 'number' ? selectedShape.borderRadius : 8}
+        onApply={selectedShape ? (r) => drawingRef.current.updateShape(selectedShape.id, { borderRadius: r }) : undefined}
       />
 
       {/* Design Token Mapper (⌘⌥U) */}
