@@ -108,6 +108,8 @@ import { TypographySpecimenPanel } from './components/canvas/TypographySpecimenP
 import { BreakpointRulerOverlay } from './components/canvas/BreakpointRulerOverlay';
 import { MicroInteractionPanel } from './components/canvas/MicroInteractionPanel';
 import { GridDuplicatorPanel, type ShapePatch } from './components/canvas/GridDuplicatorPanel';
+import { ConsistencyAuditorPanel } from './components/canvas/ConsistencyAuditorPanel';
+import { PerspectiveGridOverlay } from './components/canvas/PerspectiveGridOverlay';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -485,6 +487,8 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showBreakpointRuler, setShowBreakpointRuler] = useState(false);
   const [showMicroInteraction, setShowMicroInteraction] = useState(false);
   const [showGridDuplicator, setShowGridDuplicator] = useState(false);
+  const [showConsistencyAudit, setShowConsistencyAudit] = useState(false);
+  const [showPerspectiveGrid, setShowPerspectiveGrid] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -823,7 +827,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ⌘⇧⌥G = Gradient Editor, ⌘⌥G = Generative Art, ⌘⇧G = Ungroup, ⌘G = Group
           case 'g': {
             e.preventDefault();
-            if (e.shiftKey && e.altKey) { setShowGradientEditor(v => !v); return; }
+            if (e.shiftKey && e.altKey) { setShowPerspectiveGrid(v => !v); return; }
             if (e.altKey) { setShowGenerativeArt(v => !v); return; }
             if (e.shiftKey) { drawingRef.current.ungroup(); return; }
             drawingRef.current.group(); return;
@@ -892,7 +896,8 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }
           // ── q — Clip path editor ──────────────────────────────────────────
           case 'q': {
-            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowClipPath(c => !c); return; }
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowConsistencyAudit(v => !v); return; }
+            if (e.altKey) { e.preventDefault(); setShowClipPath(c => !c); return; }
             break;
           }
           // ── r — Color replace / Rulers / Responsive preview / Smart Rename ─
@@ -2544,6 +2549,36 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }
           showToast(`Created ${patches.length} copies`, 'action');
         }}
+      />
+
+      {/* Consistency Auditor Panel (⌘⇧⌥Q) */}
+      {showConsistencyAudit && (
+        <ConsistencyAuditorPanel
+          open={showConsistencyAudit}
+          onClose={() => setShowConsistencyAudit(false)}
+          shapes={drawing.state.shapes}
+          canvasWidth={canvasSize.width}
+          canvasHeight={canvasSize.height}
+          onSelectShape={(id) => {
+            drawingRef.current.select(id);
+            setActiveTool('cursor');
+          }}
+          onPatchShape={(id, patch) => drawingRef.current.updateShape(id, patch)}
+          onPatchAll={(patches) => {
+            for (const { id, patch } of patches) drawingRef.current.updateShape(id, patch);
+            showToast(`Fixed ${patches.length} issues`, 'action');
+          }}
+        />
+      )}
+
+      {/* Perspective Grid Overlay (⌘⇧⌥G) */}
+      <PerspectiveGridOverlay
+        open={showPerspectiveGrid}
+        canvasWidth={canvasSize.width}
+        canvasHeight={canvasSize.height}
+        zoom={viewport.zoom}
+        panX={viewport.panX}
+        panY={viewport.panY}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
