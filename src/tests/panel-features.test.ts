@@ -2092,3 +2092,117 @@ describe('GeometryPanel math utilities', () => {
     expect(pxToPtTest(12)).toBeCloseTo(9, 5);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ColorTokensPanel — inlined utility functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function normalizeHexTest(raw: string): string | null {
+  if (!raw) return null;
+  let h = raw.trim().replace(/^#/, '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  if (h.length === 6 && /^[0-9a-fA-F]{6}$/.test(h)) return '#' + h.toUpperCase();
+  if (h.length === 8 && /^[0-9a-fA-F]{8}$/.test(h)) return '#' + h.slice(0, 6).toUpperCase();
+  return null;
+}
+
+function tokenToVarNameTest(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/--+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function exportCSSTest(tokens: Array<{ name: string; hex: string }>): string {
+  const lines = tokens
+    .filter(t => t.name)
+    .map(t => `  --color-${tokenToVarNameTest(t.name)}: ${t.hex.toLowerCase()};`);
+  return `:root {\n${lines.join('\n')}\n}`;
+}
+
+function exportSCSSTest(tokens: Array<{ name: string; hex: string }>): string {
+  return tokens
+    .filter(t => t.name)
+    .map(t => `$color-${tokenToVarNameTest(t.name)}: ${t.hex.toLowerCase()};`)
+    .join('\n');
+}
+
+describe('ColorTokensPanel utilities', () => {
+  // normalizeHex
+  it('normalizeHex: 6-digit hex uppercased', () => {
+    expect(normalizeHexTest('#aabbcc')).toBe('#AABBCC');
+  });
+
+  it('normalizeHex: 3-digit hex expanded', () => {
+    expect(normalizeHexTest('#f80')).toBe('#FF8800');
+  });
+
+  it('normalizeHex: strips alpha from 8-digit hex', () => {
+    expect(normalizeHexTest('#ff000080')).toBe('#FF0000');
+  });
+
+  it('normalizeHex: no leading hash still works', () => {
+    expect(normalizeHexTest('336699')).toBe('#336699');
+  });
+
+  it('normalizeHex: invalid returns null', () => {
+    expect(normalizeHexTest('nope')).toBeNull();
+  });
+
+  it('normalizeHex: empty string returns null', () => {
+    expect(normalizeHexTest('')).toBeNull();
+  });
+
+  // tokenToVarName
+  it('tokenToVarName: spaces → hyphens', () => {
+    expect(tokenToVarNameTest('Brand Blue')).toBe('brand-blue');
+  });
+
+  it('tokenToVarName: special chars stripped', () => {
+    expect(tokenToVarNameTest('primary!color')).toBe('primarycolor');
+  });
+
+  it('tokenToVarName: double hyphens collapsed', () => {
+    expect(tokenToVarNameTest('bg--primary')).toBe('bg-primary');
+  });
+
+  it('tokenToVarName: leading/trailing hyphens stripped', () => {
+    expect(tokenToVarNameTest('-test-')).toBe('test');
+  });
+
+  it('tokenToVarName: lowercase applied', () => {
+    expect(tokenToVarNameTest('MyColor')).toBe('mycolor');
+  });
+
+  // exportCSS
+  it('exportCSS: generates :root block', () => {
+    const css = exportCSSTest([{ name: 'primary', hex: '#3B82F6' }]);
+    expect(css).toContain(':root {');
+    expect(css).toContain('--color-primary: #3b82f6;');
+  });
+
+  it('exportCSS: unnamed tokens are excluded', () => {
+    const css = exportCSSTest([
+      { name: 'good', hex: '#ff0000' },
+      { name: '', hex: '#00ff00' },
+    ]);
+    expect(css).toContain('--color-good');
+    expect(css).not.toContain('#00ff00');
+  });
+
+  // exportSCSS
+  it('exportSCSS: produces SCSS vars', () => {
+    const scss = exportSCSSTest([{ name: 'accent', hex: '#F59E0B' }]);
+    expect(scss).toBe('$color-accent: #f59e0b;');
+  });
+
+  it('exportSCSS: multiple tokens on separate lines', () => {
+    const scss = exportSCSSTest([
+      { name: 'text', hex: '#111111' },
+      { name: 'bg', hex: '#ffffff' },
+    ]);
+    expect(scss.split('\n')).toHaveLength(2);
+  });
+});

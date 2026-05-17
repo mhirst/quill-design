@@ -124,6 +124,7 @@ import { ContrastMatrixPanel } from './components/canvas/ContrastMatrixPanel';
 import { LayerStackPanel } from './components/canvas/LayerStackPanel';
 import { HandoffSpecPanel } from './components/canvas/HandoffSpecPanel';
 import { GeometryPanel } from './components/canvas/GeometryPanel';
+import { ColorTokensPanel } from './components/canvas/ColorTokensPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -517,6 +518,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showLayerStack, setShowLayerStack] = useState(false);
   const [showHandoffSpec, setShowHandoffSpec] = useState(false);
   const [showGeometry, setShowGeometry] = useState(false);
+  const [showColorTokens, setShowColorTokens] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1064,6 +1066,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── 5 — Geometry Calculator ───────────────────────────────────────
           case '5': {
             if (e.altKey) { e.preventDefault(); setShowGeometry(v => !v); return; }
+            break;
+          }
+          // ── 6 — Color Tokens ──────────────────────────────────────────────
+          case '6': {
+            if (e.altKey) { e.preventDefault(); setShowColorTokens(v => !v); return; }
             break;
           }
           // ── ] [ — Z-order ─────────────────────────────────────────────────
@@ -2822,6 +2829,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             showToast('Geometry applied', 'action');
           }
         }}
+      />
+
+      {/* Color Tokens Panel (⌘⌥6) */}
+      <ColorTokensPanel
+        open={showColorTokens}
+        onClose={() => setShowColorTokens(false)}
+        shapes={drawing.state.shapes}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
