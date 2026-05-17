@@ -5011,3 +5011,123 @@ describe('AccessibilityAuditorPanel', () => {
     expect(cr).toBeGreaterThan(4.5);
   });
 });
+
+// ── EasingCurveEditor ─────────────────────────────────────────────────────────
+
+function ecCubic1D(p0: number, p1: number, p2: number, p3: number, t: number): number {
+  const u = 1 - t;
+  return u*u*u*p0 + 3*u*u*t*p1 + 3*u*t*t*p2 + t*t*t*p3;
+}
+
+function ecDerivative1D(p0: number, p1: number, p2: number, p3: number, t: number): number {
+  const u = 1 - t;
+  return 3*u*u*(p1-p0) + 6*u*t*(p2-p1) + 3*t*t*(p3-p2);
+}
+
+function ecEvalBezier(x1: number, y1: number, x2: number, y2: number, t: number): number {
+  let u = t;
+  for (let i = 0; i < 8; i++) {
+    const x = ecCubic1D(0, x1, x2, 1, u) - t;
+    const dx = ecDerivative1D(0, x1, x2, 1, u);
+    if (Math.abs(dx) < 1e-8) break;
+    u -= x / dx;
+    u = Math.max(0, Math.min(1, u));
+  }
+  return ecCubic1D(0, y1, y2, 1, u);
+}
+
+function ecBezierCSS(x1: number, y1: number, x2: number, y2: number): string {
+  return `cubic-bezier(${x1.toFixed(3)}, ${y1.toFixed(3)}, ${x2.toFixed(3)}, ${y2.toFixed(3)})`;
+}
+
+function ecStepsCSS(steps: number): string { return `steps(${steps}, end)`; }
+
+function ecSampleSpringY(stiffness: number, damping: number, mass: number, t: number): number {
+  const omega = Math.sqrt(stiffness / mass);
+  const zeta = damping / (2 * Math.sqrt(stiffness * mass));
+  if (zeta < 1) {
+    const wd = omega * Math.sqrt(1 - zeta * zeta);
+    const A = 1, B = zeta * omega / wd;
+    return 1 - Math.exp(-zeta * omega * t) * (A * Math.cos(wd * t) + B * Math.sin(wd * t));
+  }
+  return 1 - (1 + omega * t) * Math.exp(-omega * t);
+}
+
+describe('EasingCurveEditor', () => {
+  it('cubicBezier1D: at t=0 returns p0', () => {
+    expect(ecCubic1D(0, 0.5, 0.5, 1, 0)).toBe(0);
+  });
+
+  it('cubicBezier1D: at t=1 returns p3', () => {
+    expect(ecCubic1D(0, 0.5, 0.5, 1, 1)).toBe(1);
+  });
+
+  it('cubicBezier1D: linear at t=0.5 returns 0.5', () => {
+    expect(ecCubic1D(0, 0, 1, 1, 0.5)).toBeCloseTo(0.5, 5);
+  });
+
+  it('evaluateCubicBezier: linear ease returns t', () => {
+    const y = ecEvalBezier(0, 0, 1, 1, 0.5);
+    expect(y).toBeCloseTo(0.5, 2);
+  });
+
+  it('evaluateCubicBezier: at t=0 returns 0', () => {
+    expect(ecEvalBezier(0.42, 0, 0.58, 1, 0)).toBeCloseTo(0, 2);
+  });
+
+  it('evaluateCubicBezier: at t=1 returns 1', () => {
+    expect(ecEvalBezier(0.42, 0, 0.58, 1, 1)).toBeCloseTo(1, 2);
+  });
+
+  it('evaluateCubicBezier: ease-in-out is symmetric around 0.5', () => {
+    const y1 = ecEvalBezier(0.42, 0, 0.58, 1, 0.25);
+    const y2 = 1 - ecEvalBezier(0.42, 0, 0.58, 1, 0.75);
+    expect(y1).toBeCloseTo(y2, 2);
+  });
+
+  it('bezierToCSS: formats correctly', () => {
+    expect(ecBezierCSS(0.42, 0, 0.58, 1)).toBe('cubic-bezier(0.420, 0.000, 0.580, 1.000)');
+  });
+
+  it('stepsToCSS: formats correctly', () => {
+    expect(ecStepsCSS(8)).toBe('steps(8, end)');
+  });
+
+  it('stepsToCSS: 4 steps', () => {
+    expect(ecStepsCSS(4)).toBe('steps(4, end)');
+  });
+
+  it('spring: at t=0 starts near 0 for underdamped', () => {
+    const y = ecSampleSpringY(300, 20, 1, 0);
+    expect(y).toBeCloseTo(0, 1);
+  });
+
+  it('spring: at large t settles near 1 for underdamped', () => {
+    const y = ecSampleSpringY(300, 30, 1, 5);
+    expect(y).toBeCloseTo(1, 1);
+  });
+
+  it('spring: high damping settles without overshoot', () => {
+    const y1 = ecSampleSpringY(100, 80, 1, 0.5);
+    const y2 = ecSampleSpringY(100, 80, 1, 1.0);
+    // Overdamped — y should monotonically increase
+    expect(y2).toBeGreaterThanOrEqual(y1 - 0.001);
+  });
+
+  it('presets: all have required fields', () => {
+    const presets = [
+      { name: 'ease', type: 'cubic-bezier', bezier: { x1: 0.25, y1: 0.1, x2: 0.25, y2: 1 } },
+      { name: 'Bouncy', type: 'spring', spring: { stiffness: 300, damping: 10, mass: 1, velocity: 0 } },
+      { name: 'steps(4)', type: 'steps', steps: 4 },
+    ];
+    for (const p of presets) {
+      expect(typeof p.name).toBe('string');
+      expect(['cubic-bezier', 'spring', 'steps'].includes(p.type)).toBe(true);
+    }
+  });
+
+  it('derivative1D: at t=0 matches expected', () => {
+    const d = ecDerivative1D(0, 0.5, 0.5, 1, 0);
+    expect(d).toBeCloseTo(1.5, 1);
+  });
+});

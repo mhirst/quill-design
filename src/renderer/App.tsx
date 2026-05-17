@@ -146,6 +146,7 @@ import { IconSearchPanel } from './components/canvas/IconSearchPanel';
 import type { IconDef } from './components/canvas/IconSearchPanel';
 import { CSSGridVisualizerPanel } from './components/canvas/CSSGridVisualizerPanel';
 import { AccessibilityAuditorPanel } from './components/canvas/AccessibilityAuditorPanel';
+import { EasingCurveEditor } from './components/canvas/EasingCurveEditor';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -560,6 +561,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showIconSearch, setShowIconSearch] = useState(false);
   const [showCSSGrid, setShowCSSGrid] = useState(false);
   const [showA11yAudit, setShowA11yAudit] = useState(false);
+  const [showEasingEditor, setShowEasingEditor] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1143,6 +1145,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }
           // ── 9 — Breakpoint Simulator ──────────────────────────────────────
           case '9': {
+            if (e.shiftKey) { e.preventDefault(); setShowEasingEditor(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowBreakpointSim(v => !v); return; }
             break;
           }
@@ -3133,6 +3136,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         shapes={drawing.state.shapes}
         onSelectShape={(id) => drawingRef.current.select(id)}
       />
+
+      {/* Easing Curve Editor (⌘⇧9) */}
+      <EasingCurveEditor
+        open={showEasingEditor}
+        onClose={() => setShowEasingEditor(false)}
+      />
+
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
       <TypographySpecimenPanel
