@@ -574,13 +574,14 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
     const d = drawingRef.current;
     const drafting = d.state.drafting;
     d.commitDraft();
-    setActiveTool('cursor');
     if (drafting) analytics.track('shape_created', { type: drafting.shape.type });
-    // Auto-enter text edit mode: works for both drag-drawn text (width>=4) and single-click text (width<4 → default size)
+    // Auto-enter text edit mode for text shapes, and switch to cursor
     if (drafting && drafting.shape.type === 'text') {
+      setActiveTool('cursor');
       setAutoEditId(drafting.shape.id);
       setTimeout(() => setAutoEditId(null), 100);
     }
+    // For all other shapes, stay on the current tool so the user can keep drawing
   }, []);
 
   const handleShapePreview = useCallback((patch: Partial<Shape>) => {
@@ -628,7 +629,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
 
   // ── Derived state ──────────────────────────────────────────────────────────
   const selectedShape = drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null;
-  const showShapeInspect = selectedShape !== null && activeTool === 'cursor';
+  // Show inspect panel when a shape is selected, regardless of active tool
+  // (so users can edit properties immediately after drawing without switching to cursor)
+  const showShapeInspect = selectedShape !== null && activeTool !== 'pan' && activeTool !== 'select';
   const showElementInspect = canvas.selection !== null && !showShapeInspect;
   const showRightPanel = (showShapeInspect || showElementInspect) && !rightCollapsed;
 

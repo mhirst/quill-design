@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Sparkles, Send, Square, ChevronDown, X } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
-import { cn, stripJsxBlock } from '../../lib/utils';
+import { cn } from '../../lib/utils';
 import { usePromptHistory } from '../../hooks/usePromptHistory';
 import type { ChatMessage as ChatMessageType, ElementSelection } from '@shared/types';
 
@@ -145,11 +145,8 @@ export function ChatBar({
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   };
 
-  // Collapsed bar snippet — never show raw code
-  const lastAssistantMsg = [...messages].reverse().find((m) => m.role === 'assistant');
-  const snippetText = isStreaming
-    ? 'Generating component…'
-    : (stripJsxBlock(lastAssistantMsg?.content ?? '').trim().slice(0, 80) || (lastAssistantMsg ? 'Component ready' : ''));
+  // Collapsed bar snippet — show status only when actively streaming, otherwise just the prompt hint
+  const snippetText = isStreaming ? 'Generating…' : '';
 
   const showSuggestions = expanded && value === '' && messages.length === 0;
 
@@ -320,11 +317,12 @@ export function ChatBar({
           ) : (
             <span
               className="text-sm truncate block"
-              style={{ color: snippetText ? 'var(--muted)' : 'var(--subtle)' }}
+              style={{ color: snippetText ? 'var(--accent)' : 'var(--subtle)' }}
             >
-              {snippetText ? snippetText + (snippetText.length >= 80 ? '…' : '') :
-               selectedShape?.type === 'frame' ? `Design inside "${selectedShape.name}"… (click to open)` :
-               'Design with Quill… (click to open)'}
+              {snippetText ||
+               (selectedShape?.type === 'frame' ? `Ask AI to design inside "${selectedShape.name}"…` :
+               messages.length > 0 ? 'Continue conversation… (click to open)' :
+               'Ask AI to design something… (click to open)')}
             </span>
           )}
         </div>

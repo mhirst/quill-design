@@ -51,7 +51,7 @@ const TABS: { id: LeftTab; label: string }[] = [
   { id: 'layers', label: 'Layers' },
   { id: 'pages', label: 'Pages' },
   { id: 'history', label: 'History' },
-  { id: 'components', label: 'Components' },
+  { id: 'components', label: 'Assets' },
 ];
 
 export function LeftPanel({
@@ -140,24 +140,25 @@ export function LeftPanel({
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
         height: 36,
-        paddingLeft: 4,
+        paddingLeft: 2,
       }}>
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             style={{
-              padding: '0 10px',
+              padding: '0 8px',
               height: '100%',
               background: 'none',
               border: 'none',
               borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
               color: activeTab === tab.id ? 'var(--text)' : 'var(--muted)',
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: activeTab === tab.id ? 600 : 400,
               cursor: 'pointer',
               transition: 'color 0.1s',
               flexShrink: 0,
+              whiteSpace: 'nowrap',
             }}
             onMouseEnter={(e) => { if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text)'; }}
             onMouseLeave={(e) => { if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--muted)'; }}

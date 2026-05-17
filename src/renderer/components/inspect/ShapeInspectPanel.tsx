@@ -402,22 +402,8 @@ function ShadowSection({ shape, onPreview, onChange }: { shape: Shape; onPreview
       onRemove={shape.shadow ? () => { onPreview({ shadow: false }); onChange({ shadow: false }); } : undefined}
     >
       {shape.shadow && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-              background: getShadowColor(), border: '1px solid var(--border)',
-            }} />
-            <span style={{ ...labelSt, flex: 1 }}>Drop shadow</span>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <FieldBox label="X" value={shape.shadowX}
-              onPreview={(v) => onPreview({ shadowX: v })} onCommit={(v) => onChange({ shadowX: v })} />
-            <FieldBox label="Y" value={shape.shadowY}
-              onPreview={(v) => onPreview({ shadowY: v })} onCommit={(v) => onChange({ shadowY: v })} />
-            <FieldBox label="B" value={shape.shadowBlur} min={0}
-              onPreview={(v) => onPreview({ shadowBlur: v })} onCommit={(v) => onChange({ shadowBlur: v })} />
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Color + opacity row */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <ColorSwatchInput
               value={getShadowColor()}
@@ -430,6 +416,7 @@ function ShadowSection({ shape, onPreview, onChange }: { shape: Shape; onPreview
                 onChange({ shadowColor: v + alpha });
               }}
             />
+            <span style={{ ...labelSt, flex: 1, color: 'var(--text)' }}>Drop shadow</span>
             <FieldBox
               label=""
               value={getShadowAlpha()}
@@ -444,6 +431,15 @@ function ShadowSection({ shape, onPreview, onChange }: { shape: Shape; onPreview
               }}
             />
             <span style={labelSt}>%</span>
+          </div>
+          {/* Offset + blur row */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <FieldBox label="X" value={shape.shadowX}
+              onPreview={(v) => onPreview({ shadowX: v })} onCommit={(v) => onChange({ shadowX: v })} />
+            <FieldBox label="Y" value={shape.shadowY}
+              onPreview={(v) => onPreview({ shadowY: v })} onCommit={(v) => onChange({ shadowY: v })} />
+            <FieldBox label="Blur" value={shape.shadowBlur} min={0}
+              onPreview={(v) => onPreview({ shadowBlur: v })} onCommit={(v) => onChange({ shadowBlur: v })} />
           </div>
         </div>
       )}
@@ -1199,14 +1195,26 @@ function ColorSwatchInput({
   onCommit: (v: string) => void;
 }) {
   const safeValue = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#e2e8f0';
+  // Track whether the color actually changed so we only commit when it did
+  const lastCommittedRef = useRef(safeValue);
+  // Keep ref in sync when the prop changes (e.g. undo/redo updates value from outside)
+  useEffect(() => { lastCommittedRef.current = safeValue; }, [safeValue]);
 
   return (
     <div style={{ position: 'relative', flexShrink: 0, width: 28, height: 28 }}>
       <input
         type="color"
         value={safeValue}
-        onChange={(e) => onPreview(e.target.value)}
-        onBlur={(e) => onCommit(e.target.value)}
+        onChange={(e) => {
+          onPreview(e.target.value);
+        }}
+        onBlur={(e) => {
+          // Only commit if the value actually changed from what was committed before
+          if (e.target.value !== lastCommittedRef.current) {
+            lastCommittedRef.current = e.target.value;
+            onCommit(e.target.value);
+          }
+        }}
         style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
           opacity: 0, cursor: 'pointer', padding: 0, border: 'none',
