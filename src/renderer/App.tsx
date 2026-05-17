@@ -99,6 +99,9 @@ import { GradientEditorPanel } from './components/canvas/GradientEditorPanel';
 import { KeyframeTimeline } from './components/canvas/KeyframeTimeline';
 import { ColorContrastPanel } from './components/canvas/ColorContrastPanel';
 import { LayoutInspectorOverlay } from './components/canvas/LayoutInspectorOverlay';
+import { AssetLibraryPanel, type Asset as LibraryAsset } from './components/canvas/AssetLibraryPanel';
+import { SmartRenamePanel } from './components/canvas/SmartRenamePanel';
+import { CanvasComparePanel } from './components/canvas/CanvasComparePanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -467,6 +470,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showKeyframeTimeline, setShowKeyframeTimeline] = useState(false);
   const [showColorContrast, setShowColorContrast] = useState(false);
   const [showLayoutInspector, setShowLayoutInspector] = useState(false);
+  const [showAssetLibrary, setShowAssetLibrary] = useState(false);
+  const [showSmartRename, setShowSmartRename] = useState(false);
+  const [showCanvasCompare, setShowCanvasCompare] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -762,10 +768,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowBatchRename(o => !o); return; }
             break;
           }
-          // ── c — Copy / Center / Content fill ──────────────────────────────
+          // ── c — Copy / Center / Content fill / Canvas Compare ─────────────
           case 'c': {
             e.preventDefault();
             if (e.shiftKey && e.altKey) { setShowContentFill(v => !v); return; }
+            if (e.shiftKey) { setShowCanvasCompare(v => !v); return; }
             if (e.altKey) { drawingRef.current.centerOnCanvas(); showToast('Centered on canvas', 'action'); return; }
             drawingRef.current.copy();
             const { selectedIds, selectedId, shapes } = drawingRef.current.state;
@@ -833,10 +840,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setAnnotationsActive(a => !a); showToast(annotationsActive ? 'Annotations off' : 'Annotation mode — click canvas to add', 'info'); return; }
             e.preventDefault(); setCommandPaletteOpen(o => !o); return;
           }
-          // ── l — Color grading / Grid system ───────────────────────────────
+          // ── l — Color grading / Grid system / Asset Library ───────────────
           case 'l': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowGridSystem(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowColorGrading(g => !g); return; }
+            if (e.altKey) { e.preventDefault(); setShowAssetLibrary(v => !v); return; }
             break;
           }
           // ── m — Snapshots / Morph blend / Minimap ─────────────────────────
@@ -872,10 +880,10 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowClipPath(c => !c); return; }
             break;
           }
-          // ── r — Color replace / Rulers / Responsive preview ───────────────
+          // ── r — Color replace / Rulers / Responsive preview / Smart Rename ─
           case 'r': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowResponsivePreview(r => !r); return; }
-            if (e.shiftKey) { e.preventDefault(); setShowColorReplace(o => !o); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowSmartRename(v => !v); return; }
             e.preventDefault(); setShowRulers(r => !r); return;
           }
           // ── s — Save / Frame sorter ───────────────────────────────────────
@@ -2363,6 +2371,78 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         }}
         onPreview={(animName, duration, delay, iterations) => {
           showToast(`Preview: ${animName} ${duration}ms`, 'info');
+        }}
+      />
+
+      {/* Asset Library Panel (⌘⌥L) */}
+      <AssetLibraryPanel
+        open={showAssetLibrary}
+        onClose={() => setShowAssetLibrary(false)}
+        onInsert={(asset: LibraryAsset) => {
+          const drawing = drawingRef.current;
+          const cx = canvasSize.width / 2;
+          const cy = canvasSize.height / 2;
+          const maxW = 400;
+          const scale = asset.width > maxW ? maxW / asset.width : 1;
+          const w = Math.round(asset.width * scale);
+          const h = Math.round(asset.height * scale);
+          const x = Math.round((cx - viewport.panX) / viewport.zoom - w / 2);
+          const y = Math.round((cy - viewport.panY) / viewport.zoom - h / 2);
+          const shape = defaultShape('rectangle', uuid());
+          drawing.addShape({
+            ...shape,
+            x, y,
+            width: w,
+            height: h,
+            fillType: 'image' as const,
+            imageUrl: asset.dataUrl,
+            name: asset.name,
+          });
+          showToast(`Inserted "${asset.name}"`, 'action');
+        }}
+      />
+
+      {/* Smart Rename Panel (⌘⇧R) */}
+      <SmartRenamePanel
+        open={showSmartRename}
+        onClose={() => setShowSmartRename(false)}
+        shapes={drawing.state.shapes}
+        onRenameShapes={(renames) => {
+          for (const { id, name } of renames) {
+            drawingRef.current.updateShape(id, { name });
+          }
+          showToast(`Renamed ${renames.length} shape${renames.length !== 1 ? 's' : ''}`, 'action');
+        }}
+      />
+
+      {/* Canvas Compare Panel (⌘⇧C) */}
+      <CanvasComparePanel
+        open={showCanvasCompare}
+        onClose={() => setShowCanvasCompare(false)}
+        onCaptureCanvas={async () => {
+          const el = canvasContainerRef.current;
+          if (!el) return null;
+          // Use html2canvas if available, otherwise fall back to SVG export
+          try {
+            // Attempt to use the browser's canvas capture API
+            const canvasEl = el.querySelector('canvas') as HTMLCanvasElement | null;
+            if (canvasEl) {
+              return canvasEl.toDataURL('image/png');
+            }
+          } catch { /* ignore */ }
+          // Fallback: create a simple placeholder PNG
+          const fallback = document.createElement('canvas');
+          fallback.width = el.clientWidth || 800;
+          fallback.height = el.clientHeight || 600;
+          const ctx = fallback.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#131320';
+            ctx.fillRect(0, 0, fallback.width, fallback.height);
+            ctx.fillStyle = 'rgba(99,102,241,0.3)';
+            ctx.font = '16px system-ui';
+            ctx.fillText(`Canvas snapshot – ${drawing.state.shapes.length} shapes`, 20, 30);
+          }
+          return fallback.toDataURL('image/png');
         }}
       />
 

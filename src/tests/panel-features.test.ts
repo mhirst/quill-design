@@ -869,3 +869,247 @@ describe('LayoutInspectorOverlay — nearest neighbor computation', () => {
     expect(w * zoom).toBe(180);
   });
 });
+
+// ── SmartRenamePanel — naming logic ──────────────────────────────────────────
+
+type RenameShapeType = 'frame' | 'rectangle' | 'ellipse' | 'text' | 'path';
+
+interface RenameShape {
+  id: string;
+  type: RenameShapeType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  name?: string;
+  text?: string;
+  fillType?: string;
+  imageUrl?: string;
+}
+
+const RENAME_TYPE_PREFIX: Record<string, string> = {
+  frame: 'Frame', rectangle: 'Rect', ellipse: 'Circle', text: 'Text', path: 'Path',
+};
+
+const RENAME_ROLE_HINTS: { pattern: RegExp; role: string }[] = [
+  { pattern: /^(heading|title|h[1-6])/i, role: 'Heading' },
+  { pattern: /^(button|btn|cta)/i, role: 'Button' },
+  { pattern: /^(label|tag|chip|badge)/i, role: 'Label' },
+  { pattern: /^(icon)/i, role: 'Icon' },
+  { pattern: /^(card|tile|panel|box)/i, role: 'Card' },
+  { pattern: /^(nav|menu|sidebar|header|footer)/i, role: 'Nav' },
+  { pattern: /^(input|field|form|search)/i, role: 'Input' },
+  { pattern: /^(avatar|profile|user)/i, role: 'Avatar' },
+  { pattern: /^(background|bg)/i, role: 'Background' },
+  { pattern: /^(logo)/i, role: 'Logo' },
+];
+
+function inferRole(shape: RenameShape): string | null {
+  const nameCheck = (shape.name ?? '').trim();
+  const textCheck = (shape.text ?? '').trim();
+  for (const { pattern, role } of RENAME_ROLE_HINTS) {
+    if (nameCheck && pattern.test(nameCheck)) return role;
+    if (textCheck && pattern.test(textCheck)) return role;
+  }
+  return null;
+}
+
+function extractContent(shape: RenameShape): string {
+  if (shape.type === 'text' && shape.text) {
+    const raw = shape.text.trim().replace(/\s+/g, ' ');
+    return raw.length > 22 ? raw.slice(0, 20) + '…' : raw;
+  }
+  return '';
+}
+
+function suggestNameTest(shape: RenameShape, _allShapes: RenameShape[], index: number): string {
+  const type = shape.type;
+  const role = inferRole(shape);
+  if (role) {
+    const content = extractContent(shape);
+    if (content) return role + ' – ' + content;
+    return role;
+  }
+  if (type === 'text' && shape.text?.trim()) {
+    return 'Text – ' + extractContent(shape);
+  }
+  if (type === 'frame') {
+    if (shape.width >= 375 && shape.width <= 430) return 'Mobile Screen ' + (index + 1);
+    if (shape.width >= 768 && shape.width <= 1024) return 'Tablet Screen ' + (index + 1);
+    if (shape.width > 1024) return 'Desktop Screen ' + (index + 1);
+    return 'Frame ' + (index + 1);
+  }
+  if (type === 'ellipse') {
+    const sq = Math.abs(shape.width - shape.height) < 4;
+    if (sq && shape.width < 80) return 'Avatar ' + (index + 1);
+    if (sq && shape.width >= 80) return 'Circle ' + (index + 1);
+    return 'Ellipse ' + (index + 1);
+  }
+  if (shape.fillType === 'image' || shape.imageUrl) return 'Image ' + (index + 1);
+  if (shape.fillType === 'linear-gradient') return 'Gradient ' + (index + 1);
+  if (type === 'rectangle') {
+    const sq = Math.abs(shape.width - shape.height) < 4;
+    if (sq && shape.width <= 32) return 'Icon ' + (index + 1);
+    if (sq && shape.width <= 48) return 'Swatch ' + (index + 1);
+  }
+  return (RENAME_TYPE_PREFIX[type] ?? 'Shape') + ' ' + (index + 1);
+}
+
+function deduplicateNamesTest(rows: { id: string; suggested: string }[]): Map<string, string> {
+  const counts = new Map<string, number>();
+  const result = new Map<string, string>();
+  for (const row of rows) {
+    const base = row.suggested;
+    const n = (counts.get(base) ?? 0) + 1;
+    counts.set(base, n);
+    result.set(row.id, n === 1 ? base : base + ' ' + n);
+  }
+  return result;
+}
+
+describe('SmartRenamePanel naming logic', () => {
+  it('suggests Mobile Screen 1 for 390px-wide frame', () => {
+    const s: RenameShape = { id: '1', type: 'frame', x: 0, y: 0, width: 390, height: 844 };
+    expect(suggestNameTest(s, [s], 0)).toBe('Mobile Screen 1');
+  });
+
+  it('suggests Desktop Screen 1 for wide frame', () => {
+    const s: RenameShape = { id: '1', type: 'frame', x: 0, y: 0, width: 1440, height: 900 };
+    expect(suggestNameTest(s, [s], 0)).toBe('Desktop Screen 1');
+  });
+
+  it('suggests Avatar 1 for small square ellipse', () => {
+    const s: RenameShape = { id: '1', type: 'ellipse', x: 0, y: 0, width: 40, height: 40 };
+    expect(suggestNameTest(s, [s], 0)).toBe('Avatar 1');
+  });
+
+  it('suggests Circle 1 for large square ellipse', () => {
+    const s: RenameShape = { id: '1', type: 'ellipse', x: 0, y: 0, width: 120, height: 120 };
+    expect(suggestNameTest(s, [s], 0)).toBe('Circle 1');
+  });
+
+  it('detects Button role from name', () => {
+    const s: RenameShape = { id: '1', type: 'rectangle', x: 0, y: 0, width: 120, height: 40, name: 'btn-primary' };
+    expect(suggestNameTest(s, [s], 0)).toBe('Button');
+  });
+
+  it('uses text content for plain text shapes', () => {
+    const s: RenameShape = { id: '1', type: 'text', x: 0, y: 0, width: 200, height: 20, text: 'Hello World' };
+    const name = suggestNameTest(s, [s], 0);
+    expect(name).toContain('Hello World');
+  });
+
+  it('truncates long text content', () => {
+    const s: RenameShape = { id: '1', type: 'text', x: 0, y: 0, width: 400, height: 24, text: 'This is a very long piece of text content here' };
+    const name = suggestNameTest(s, [s], 0);
+    expect(name.length).toBeLessThan(40);
+  });
+
+  it('suggests Icon 1 for tiny square rectangle', () => {
+    const s: RenameShape = { id: '1', type: 'rectangle', x: 0, y: 0, width: 24, height: 24 };
+    expect(suggestNameTest(s, [s], 0)).toBe('Icon 1');
+  });
+
+  it('suggests Image 1 for image-filled shape', () => {
+    const s: RenameShape = { id: '1', type: 'rectangle', x: 0, y: 0, width: 400, height: 300, fillType: 'image' };
+    expect(suggestNameTest(s, [s], 0)).toBe('Image 1');
+  });
+
+  it('deduplicates same-name suggestions', () => {
+    const rows = [
+      { id: 'a', suggested: 'Button' },
+      { id: 'b', suggested: 'Button' },
+      { id: 'c', suggested: 'Button' },
+    ];
+    const result = deduplicateNamesTest(rows);
+    expect(result.get('a')).toBe('Button');
+    expect(result.get('b')).toBe('Button 2');
+    expect(result.get('c')).toBe('Button 3');
+  });
+
+  it('does not deduplicate unique names', () => {
+    const rows = [{ id: 'a', suggested: 'Avatar 1' }, { id: 'b', suggested: 'Circle 1' }];
+    const result = deduplicateNamesTest(rows);
+    expect(result.get('a')).toBe('Avatar 1');
+    expect(result.get('b')).toBe('Circle 1');
+  });
+
+  it('detects Nav role from nav in existing name', () => {
+    const s: RenameShape = { id: '1', type: 'frame', x: 0, y: 0, width: 320, height: 60, name: 'nav-bar' };
+    expect(suggestNameTest(s, [s], 0)).toBe('Nav');
+  });
+
+  it('falls back to type prefix + index', () => {
+    const s: RenameShape = { id: '1', type: 'path', x: 0, y: 0, width: 200, height: 100 };
+    expect(suggestNameTest(s, [s], 2)).toBe('Path 3');
+  });
+
+  it('Swatch role for 48x48 rectangle', () => {
+    const s: RenameShape = { id: '1', type: 'rectangle', x: 0, y: 0, width: 48, height: 48 };
+    expect(suggestNameTest(s, [s], 0)).toBe('Swatch 1');
+  });
+
+  it('Gradient suggested for linear-gradient fill', () => {
+    const s: RenameShape = { id: '1', type: 'rectangle', x: 0, y: 0, width: 200, height: 100, fillType: 'linear-gradient' };
+    expect(suggestNameTest(s, [s], 0)).toBe('Gradient 1');
+  });
+});
+
+// ── CanvasComparePanel — snapshot logic ───────────────────────────────────────
+
+function makeCompareSnap(id: string, label: string, takenAt: number) {
+  return { id, label, dataUrl: 'data:image/png;base64,abc' + id, takenAt, width: 800, height: 600 };
+}
+
+describe('CanvasComparePanel snapshot logic', () => {
+  it('snapshot stores id and label', () => {
+    const s = makeCompareSnap('s1', 'Snap 1', 1000);
+    expect(s.id).toBe('s1');
+    expect(s.label).toBe('Snap 1');
+  });
+
+  it('dataUrl starts with data:image', () => {
+    const s = makeCompareSnap('s2', 'Snap 2', 2000);
+    expect(s.dataUrl.startsWith('data:image')).toBe(true);
+  });
+
+  it('can remove a snapshot by id', () => {
+    const snaps = [makeCompareSnap('a', 'A', 1000), makeCompareSnap('b', 'B', 2000)];
+    const remaining = snaps.filter(s => s.id !== 'a');
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].id).toBe('b');
+  });
+
+  it('finding before/after snapshots by id works', () => {
+    const snaps = [makeCompareSnap('b1', 'Before', 1000), makeCompareSnap('a1', 'After', 2000)];
+    const before = snaps.find(s => s.id === 'b1');
+    const after = snaps.find(s => s.id === 'a1');
+    expect(before?.label).toBe('Before');
+    expect(after?.label).toBe('After');
+  });
+
+  it('snapshot dimensions stored correctly', () => {
+    const s = makeCompareSnap('d', 'Dims', 1000);
+    expect(s.width).toBe(800);
+    expect(s.height).toBe(600);
+  });
+
+  it('clear all snapshots produces empty array', () => {
+    const snaps = [makeCompareSnap('1', 'A', 1), makeCompareSnap('2', 'B', 2)];
+    const cleared = snaps.filter(() => false);
+    expect(cleared.length).toBe(0);
+  });
+
+  it('slider percent clamps to 0-100', () => {
+    const clamp = (v: number) => Math.max(0, Math.min(100, v));
+    expect(clamp(-10)).toBe(0);
+    expect(clamp(50)).toBe(50);
+    expect(clamp(110)).toBe(100);
+  });
+
+  it('after snapshot has later timestamp than before', () => {
+    const before = makeCompareSnap('b', 'Before', 1000);
+    const after = makeCompareSnap('a', 'After', 2000);
+    expect(after.takenAt).toBeGreaterThan(before.takenAt);
+  });
+});
