@@ -110,6 +110,7 @@ import { MicroInteractionPanel } from './components/canvas/MicroInteractionPanel
 import { GridDuplicatorPanel, type ShapePatch } from './components/canvas/GridDuplicatorPanel';
 import { ConsistencyAuditorPanel } from './components/canvas/ConsistencyAuditorPanel';
 import { PerspectiveGridOverlay } from './components/canvas/PerspectiveGridOverlay';
+import { CSSSnippetPanel } from './components/canvas/CSSSnippetPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -489,6 +490,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showGridDuplicator, setShowGridDuplicator] = useState(false);
   const [showConsistencyAudit, setShowConsistencyAudit] = useState(false);
   const [showPerspectiveGrid, setShowPerspectiveGrid] = useState(false);
+  const [showCSSSnippet, setShowCSSSnippet] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -982,6 +984,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── x — Accessibility ─────────────────────────────────────────────
           case 'x': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowAccessibility(a => !a); return; }
+            if (e.altKey) { e.preventDefault(); setShowCSSSnippet(v => !v); return; }
             break;
           }
           // ── y — Color harmony / Typography Specimen / Redo ────────────────
@@ -2579,6 +2582,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         zoom={viewport.zoom}
         panX={viewport.panX}
         panY={viewport.panY}
+      />
+
+      {/* CSS Snippet Panel (⌘⌥X) */}
+      <CSSSnippetPanel
+        open={showCSSSnippet}
+        onClose={() => setShowCSSSnippet(false)}
+        selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
