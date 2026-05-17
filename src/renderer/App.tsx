@@ -119,6 +119,7 @@ import { ColorVisionOverlay } from './components/canvas/ColorVisionOverlay';
 import { PathInspectorPanel } from './components/canvas/PathInspectorPanel';
 import { FontPairingPanel } from './components/canvas/FontPairingPanel';
 import { EasingCurvePanel } from './components/canvas/EasingCurvePanel';
+import { IconExportPanel } from './components/canvas/IconExportPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -507,6 +508,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showPathInspector, setShowPathInspector] = useState(false);
   const [showFontPairing, setShowFontPairing] = useState(false);
   const [showEasingCurve, setShowEasingCurve] = useState(false);
+  const [showIconExport, setShowIconExport] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -921,10 +923,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowClipPath(c => !c); return; }
             break;
           }
-          // ── r — Color replace / Rulers / Responsive preview / Smart Rename ─
+          // ── r — Color replace / Rulers / Responsive preview / Smart Rename / Icon Export
+          // ⌘⇧⌥R = Responsive Preview, ⌘⇧R = Smart Rename, ⌘⌥R = Icon Export, ⌘R = Rulers
           case 'r': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowResponsivePreview(r => !r); return; }
             if (e.shiftKey) { e.preventDefault(); setShowSmartRename(v => !v); return; }
+            if (e.altKey) { e.preventDefault(); setShowIconExport(v => !v); return; }
             e.preventDefault(); setShowRulers(r => !r); return;
           }
           // ── s — Save / Frame sorter ───────────────────────────────────────
@@ -2730,6 +2734,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             showToast(`Applied easing to "${selectedShape.name}"`, 'action');
           }
         }}
+      />
+
+      {/* Icon Export Studio (⌘⌥R) */}
+      <IconExportPanel
+        open={showIconExport}
+        onClose={() => setShowIconExport(false)}
+        selectedShape={selectedShape}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
