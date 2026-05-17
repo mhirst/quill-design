@@ -152,6 +152,7 @@ import type { ShapeProperty } from './components/canvas/DesignTokenMapper';
 import { ImageFilterStudio } from './components/canvas/ImageFilterStudio';
 import { ShadowBuilderPanel } from './components/canvas/ShadowBuilderPanel';
 import { TypographyScaleInspector } from './components/canvas/TypographyScaleInspector';
+import { ColorMixingPanel } from './components/canvas/ColorMixingPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -571,6 +572,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showFilterStudio, setShowFilterStudio] = useState(false);
   const [showShadowBuilder, setShowShadowBuilder] = useState(false);
   const [showTypoScaleInspector, setShowTypoScaleInspector] = useState(false);
+  const [showColorMixing, setShowColorMixing] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1113,9 +1115,10 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowCodeExport(o => !o); return; }
             break;
           }
-          // ── 2 — Color Contrast Checker ────────────────────────────────────
+          // ── 2 — Color Contrast Checker / Color Mixer ─────────────────────
           case '2': {
             if (e.shiftKey) { e.preventDefault(); setShowColorContrast(v => !v); return; }
+            if (e.altKey) { e.preventDefault(); setShowColorMixing(v => !v); return; }
             break;
           }
           // ── 3 — 3D Transform / Layer Stack 3D ────────────────────────────
@@ -3174,6 +3177,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onClose={() => setShowTypoScaleInspector(false)}
         selectedShapeFontSize={selectedShape?.fontSize}
         onApplyFontSize={selectedShape ? (px) => drawingRef.current.updateShape(selectedShape.id, { fontSize: px }) : undefined}
+      />
+
+      {/* Color Mixing Panel (⌘⌥2) */}
+      <ColorMixingPanel
+        open={showColorMixing}
+        onClose={() => setShowColorMixing(false)}
+        onPickColor={selectedShape ? (hex) => drawingRef.current.updateShape(selectedShape.id, { fill: hex }) : undefined}
       />
 
       {/* Design Token Mapper (⌘⌥U) */}

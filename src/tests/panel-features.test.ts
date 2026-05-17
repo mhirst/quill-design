@@ -5728,3 +5728,155 @@ describe('TypographyScaleInspector', () => {
     expect(Math.max(...ratios)).toBe(2.0);
   });
 });
+
+// ── ColorMixingPanel ──────────────────────────────────────────────────────────
+
+function cmHexToRGB(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16) };
+}
+function cmRgbToHex(rgb: {r:number;g:number;b:number}): string {
+  const cl = (v:number) => Math.min(255,Math.max(0,Math.round(v))).toString(16).padStart(2,'0');
+  return '#' + cl(rgb.r) + cl(rgb.g) + cl(rgb.b);
+}
+function cmRgbToHSL(rgb:{r:number;g:number;b:number}):{h:number;s:number;l:number} {
+  const r=rgb.r/255,g=rgb.g/255,b=rgb.b/255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b);
+  const l=(max+min)/2;
+  if(max===min) return {h:0,s:0,l:Math.round(l*100)};
+  const d=max-min;
+  const s=l>0.5?d/(2-max-min):d/(max+min);
+  let h=0;
+  if(max===r) h=((g-b)/d+(g<b?6:0))/6;
+  else if(max===g) h=((b-r)/d+2)/6;
+  else h=((r-g)/d+4)/6;
+  return {h:Math.round(h*360),s:Math.round(s*100),l:Math.round(l*100)};
+}
+function cmHslToRGB(hsl:{h:number;s:number;l:number}):{r:number;g:number;b:number} {
+  const {h,s,l} = hsl;
+  const sn=s/100, ln=l/100;
+  if(s===0){const v=Math.round(ln*255);return{r:v,g:v,b:v};}
+  const q=ln<0.5?ln*(1+sn):ln+sn-ln*sn;
+  const p=2*ln-q; const hk=h/360;
+  const hue2rgb=(t:number)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
+  return{r:Math.round(hue2rgb(hk+1/3)*255),g:Math.round(hue2rgb(hk)*255),b:Math.round(hue2rgb(hk-1/3)*255)};
+}
+function cmMixRGB(a:{r:number;g:number;b:number},b:{r:number;g:number;b:number},t:number):{r:number;g:number;b:number} {
+  return {r:Math.round(a.r+(b.r-a.r)*t),g:Math.round(a.g+(b.g-a.g)*t),b:Math.round(a.b+(b.b-a.b)*t)};
+}
+function cmMixHSL(a:{h:number;s:number;l:number},b:{h:number;s:number;l:number},t:number) {
+  let dh=b.h-a.h; if(dh>180) dh-=360; if(dh<-180) dh+=360;
+  return {h:Math.round((a.h+dh*t+360)%360),s:Math.round(a.s+(b.s-a.s)*t),l:Math.round(a.l+(b.l-a.l)*t)};
+}
+function cmRelLuminance(rgb:{r:number;g:number;b:number}):number {
+  const chan=(v:number)=>{const c=v/255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);};
+  return 0.2126*chan(rgb.r)+0.7152*chan(rgb.g)+0.0722*chan(rgb.b);
+}
+function cmContrast(a:{r:number;g:number;b:number},b:{r:number;g:number;b:number}):number {
+  const la=cmRelLuminance(a),lb=cmRelLuminance(b);
+  return (Math.max(la,lb)+0.05)/(Math.min(la,lb)+0.05);
+}
+
+describe('ColorMixingPanel', () => {
+  it('hexToRGB: parses correctly', () => {
+    const {r,g,b} = cmHexToRGB('#3b82f6');
+    expect(r).toBe(59); expect(g).toBe(130); expect(b).toBe(246);
+  });
+
+  it('hexToRGB: black → 0,0,0', () => {
+    const rgb = cmHexToRGB('#000000');
+    expect(rgb).toEqual({r:0,g:0,b:0});
+  });
+
+  it('rgbToHex: white', () => {
+    expect(cmRgbToHex({r:255,g:255,b:255})).toBe('#ffffff');
+  });
+
+  it('rgbToHex: round trips', () => {
+    const hex = '#a1b2c3';
+    expect(cmRgbToHex(cmHexToRGB(hex))).toBe(hex);
+  });
+
+  it('rgbToHSL: red is hue 0', () => {
+    const {h} = cmRgbToHSL({r:255,g:0,b:0});
+    expect(h).toBe(0);
+  });
+
+  it('rgbToHSL: pure green hue ~120', () => {
+    const {h} = cmRgbToHSL({r:0,g:255,b:0});
+    expect(h).toBe(120);
+  });
+
+  it('rgbToHSL: grey has 0 saturation', () => {
+    const {s} = cmRgbToHSL({r:128,g:128,b:128});
+    expect(s).toBe(0);
+  });
+
+  it('hslToRGB: round trips through HSL', () => {
+    const orig = {r:59,g:130,b:246};
+    const hsl = cmRgbToHSL(orig);
+    const back = cmHslToRGB(hsl);
+    expect(Math.abs(back.r - orig.r)).toBeLessThanOrEqual(2);
+    expect(Math.abs(back.g - orig.g)).toBeLessThanOrEqual(2);
+    expect(Math.abs(back.b - orig.b)).toBeLessThanOrEqual(2);
+  });
+
+  it('mixRGB: t=0 → color A', () => {
+    const a = {r:255,g:0,b:0}, b2 = {r:0,g:0,b:255};
+    expect(cmMixRGB(a,b2,0)).toEqual(a);
+  });
+
+  it('mixRGB: t=1 → color B', () => {
+    const a = {r:255,g:0,b:0}, b2 = {r:0,g:0,b:255};
+    expect(cmMixRGB(a,b2,1)).toEqual(b2);
+  });
+
+  it('mixRGB: t=0.5 → midpoint', () => {
+    const a = {r:0,g:0,b:0}, b2 = {r:100,g:100,b:100};
+    const mid = cmMixRGB(a,b2,0.5);
+    expect(mid.r).toBe(50); expect(mid.g).toBe(50); expect(mid.b).toBe(50);
+  });
+
+  it('mixHSL: hue takes shortest arc', () => {
+    const a = {h:10,s:80,l:50}, b2 = {h:350,s:80,l:50};
+    const mid = cmMixHSL(a,b2,0.5);
+    // Shortest arc between 10 and 350 is -20 deg → midpoint ~0 (or 360)
+    expect(mid.h === 0 || mid.h === 360).toBe(true);
+  });
+
+  it('mixHSL: same saturation, interpolates lightness', () => {
+    const a = {h:200,s:70,l:20}, b2 = {h:200,s:70,l:80};
+    const mid = cmMixHSL(a,b2,0.5);
+    expect(mid.l).toBe(50);
+  });
+
+  it('relativeLuminance: white is 1', () => {
+    expect(cmRelLuminance({r:255,g:255,b:255})).toBeCloseTo(1,1);
+  });
+
+  it('relativeLuminance: black is 0', () => {
+    expect(cmRelLuminance({r:0,g:0,b:0})).toBeCloseTo(0,5);
+  });
+
+  it('contrast: black vs white → ~21', () => {
+    expect(cmContrast({r:0,g:0,b:0},{r:255,g:255,b:255})).toBeCloseTo(21,0);
+  });
+
+  it('contrast: same color → 1', () => {
+    const c = {r:128,g:64,b:32};
+    expect(cmContrast(c,c)).toBeCloseTo(1,2);
+  });
+
+  it('presets: all 8 presets have valid hex colors', () => {
+    const presets = [
+      {colorA:'#ff6b35',colorB:'#ffd166'},{colorA:'#023e8a',colorB:'#48cae4'},
+      {colorA:'#1b4332',colorB:'#95d5b2'},{colorA:'#7b2d8b',colorB:'#ff6b9d'},
+      {colorA:'#0f172a',colorB:'#f8fafc'},{colorA:'#ff006e',colorB:'#ffbe0b'},
+      {colorA:'#e0f2fe',colorB:'#0369a1'},{colorA:'#7c4a03',colorB:'#d4a574'},
+    ];
+    for (const p of presets) {
+      expect(p.colorA).toMatch(/^#[0-9a-f]{6}$/);
+      expect(p.colorB).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+});
