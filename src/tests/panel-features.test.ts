@@ -1712,3 +1712,98 @@ describe('PathInspectorPanel utilities', () => {
     expect(closed).toBe(false);
   });
 });
+
+// ── EasingCurvePanel utilities ────────────────────────────────────────────────
+
+function cubicBezier1DTest(t: number, p1: number, p2: number): number {
+  const mt = 1 - t;
+  return 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t;
+}
+
+function sampleCurveTest(x1: number, y1: number, x2: number, y2: number, steps = 80): Array<[number, number]> {
+  const pts: Array<[number, number]> = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = cubicBezier1DTest(t, x1, x2);
+    const y = cubicBezier1DTest(t, y1, y2);
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+function evalCurveTest(x: number, x1: number, y1: number, x2: number, y2: number): number {
+  let lo = 0; let hi = 1;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    const xMid = cubicBezier1DTest(mid, x1, x2);
+    if (Math.abs(xMid - x) < 0.0001) return cubicBezier1DTest(mid, y1, y2);
+    if (xMid < x) lo = mid; else hi = mid;
+  }
+  return cubicBezier1DTest((lo + hi) / 2, y1, y2);
+}
+
+function formatCubicBezierTest(x1: number, y1: number, x2: number, y2: number): string {
+  const f = (n: number) => Number(n.toFixed(3)).toString();
+  return `cubic-bezier(${f(x1)}, ${f(y1)}, ${f(x2)}, ${f(y2)})`;
+}
+
+describe('EasingCurvePanel utilities', () => {
+  it('linear curve (0,0,1,1) evaluates y=x at all points', () => {
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      const y = evalCurveTest(t, 0, 0, 1, 1);
+      expect(Math.abs(y - t)).toBeLessThan(0.02);
+    }
+  });
+
+  it('ease-in curve starts slow and ends fast', () => {
+    // ease-in: x1=0.42,y1=0,x2=1,y2=1
+    const x1 = 0.42; const y1 = 0; const x2 = 1; const y2 = 1;
+    const yAt25 = evalCurveTest(0.25, x1, y1, x2, y2);
+    const yAt75 = evalCurveTest(0.75, x1, y1, x2, y2);
+    // ease-in: slow at start means yAt25 < 0.25 (progress behind time)
+    expect(yAt25).toBeLessThan(0.25);
+    // fast at end means yAt75 > 0.5
+    expect(yAt75).toBeGreaterThan(0.5);
+  });
+
+  it('ease-out curve starts fast and ends slow', () => {
+    // ease-out: x1=0,y1=0,x2=0.58,y2=1
+    const x1 = 0; const y1 = 0; const x2 = 0.58; const y2 = 1;
+    const yAt25 = evalCurveTest(0.25, x1, y1, x2, y2);
+    // ease-out: fast at start means yAt25 > 0.25
+    expect(yAt25).toBeGreaterThan(0.25);
+  });
+
+  it('curve endpoints are always (0,0) and (1,1)', () => {
+    const pts = sampleCurveTest(0.25, 0.1, 0.25, 1);
+    const [x0, y0] = pts[0];
+    const [x1, y1] = pts[pts.length - 1];
+    expect(Math.abs(x0)).toBeLessThan(0.001);
+    expect(Math.abs(y0)).toBeLessThan(0.001);
+    expect(Math.abs(x1 - 1)).toBeLessThan(0.001);
+    expect(Math.abs(y1 - 1)).toBeLessThan(0.001);
+  });
+
+  it('sampleCurve returns correct number of points', () => {
+    const pts = sampleCurveTest(0.5, 0.5, 0.5, 0.5, 40);
+    expect(pts).toHaveLength(41); // steps + 1
+  });
+
+  it('formatCubicBezier generates correct CSS string', () => {
+    const css = formatCubicBezierTest(0.25, 0.1, 0.25, 1);
+    expect(css).toBe('cubic-bezier(0.25, 0.1, 0.25, 1)');
+  });
+
+  it('formatCubicBezier rounds to 3 decimal places', () => {
+    const css = formatCubicBezierTest(0.123456, 0, 0.987654, 1);
+    expect(css).toContain('0.123');
+    expect(css).toContain('0.988');
+  });
+
+  it('back-out curve overshoots 1.0 (y > 1 temporarily)', () => {
+    // back-out: x1=0.175, y1=0.885, x2=0.32, y2=1.275
+    const pts = sampleCurveTest(0.175, 0.885, 0.32, 1.275);
+    const maxY = Math.max(...pts.map(([, y]) => y));
+    expect(maxY).toBeGreaterThan(1.0); // overshoots
+  });
+});

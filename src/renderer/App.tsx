@@ -118,6 +118,7 @@ import { GlobalSearchPanel } from './components/canvas/GlobalSearchPanel';
 import { ColorVisionOverlay } from './components/canvas/ColorVisionOverlay';
 import { PathInspectorPanel } from './components/canvas/PathInspectorPanel';
 import { FontPairingPanel } from './components/canvas/FontPairingPanel';
+import { EasingCurvePanel } from './components/canvas/EasingCurvePanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -505,6 +506,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showColorVision, setShowColorVision] = useState(false);
   const [showPathInspector, setShowPathInspector] = useState(false);
   const [showFontPairing, setShowFontPairing] = useState(false);
+  const [showEasingCurve, setShowEasingCurve] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -825,11 +827,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (dupCount > 0) showToast(dupCount === 1 ? `Duplicated "${dShapes.find(s => s.id === dId)?.name ?? 'shape'}"` : `Duplicated ${dupCount} shapes`, 'action');
             return;
           }
-          // ── e — Dev spec / Batch export / Palette extractor ───────────────
-          // ⌘⇧⌥E = Batch Export, ⌘⇧E = Dev Spec (⌘E = nothing)
+          // ── e — Dev spec / Batch export / Easing curve ───────────────────
+          // ⌘⇧⌥E = Batch Export, ⌘⇧E = Dev Spec, ⌘⌥E = Easing Curve Editor
           case 'e': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowBatchExport(b => !b); return; }
             if (e.shiftKey) { e.preventDefault(); setShowDevSpec(o => !o); return; }
+            if (e.altKey) { e.preventDefault(); setShowEasingCurve(v => !v); return; }
             break;
           }
           // ── f — Spotlight / Custom fonts / Fluid type / Focus Mode ────────
@@ -2712,6 +2715,19 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           if (selectedShape) {
             drawingRef.current.updateShape(selectedShape.id, patch);
             showToast(`Applied font: ${(patch as { fontFamily?: string }).fontFamily ?? 'font'}`, 'action');
+          }
+        }}
+      />
+
+      {/* Easing Curve Editor (⌘⌥E) */}
+      <EasingCurvePanel
+        open={showEasingCurve}
+        onClose={() => setShowEasingCurve(false)}
+        selectedShape={selectedShape}
+        onApplyEasing={(easing, dur) => {
+          if (selectedShape) {
+            drawingRef.current.updateShape(selectedShape.id, { transitionEasing: easing, transitionDuration: dur });
+            showToast(`Applied easing to "${selectedShape.name}"`, 'action');
           }
         }}
       />
