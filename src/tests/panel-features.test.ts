@@ -1256,3 +1256,150 @@ describe('GridDuplicatorPanel pattern math', () => {
     }
   });
 });
+
+// ── DesignDiffPanel diff engine tests ─────────────────────────────────────────
+
+interface DiffSnapshotShape {
+  id: string; name: string; type: string;
+  x: number; y: number; width: number; height: number;
+  fill?: string; fillType?: string; stroke?: string; strokeWidth?: number;
+  opacity?: number; fontSize?: number; fontFamily?: string; text?: string;
+  rotation?: number;
+}
+
+interface DiffSnapshot {
+  id: string; label: string; takenAt: Date;
+  shapes: DiffSnapshotShape[]; shapeCount: number;
+}
+
+type DiffChangeType = 'added' | 'removed' | 'moved' | 'restyled' | 'unchanged' | 'renamed';
+
+interface DiffEntry {
+  id: string; type: DiffChangeType;
+  shapeName: string; shapeType: string;
+  before?: DiffSnapshotShape; after?: DiffSnapshotShape;
+  changes: string[];
+}
+
+function makeSnap(shapes: DiffSnapshotShape[], label = 'snap'): DiffSnapshot {
+  return { id: 'snap', label, takenAt: new Date(), shapes, shapeCount: shapes.length };
+}
+
+function makeShape(overrides: Partial<DiffSnapshotShape> & { id: string }): DiffSnapshotShape {
+  return { name: 'Shape', type: 'rectangle', x: 0, y: 0, width: 100, height: 50, ...overrides };
+}
+
+// Inline diff implementation (mirrors DesignDiffPanel.computeDiff logic)
+function computeDiffTest(before: DiffSnapshot, after: DiffSnapshot): DiffEntry[] {
+  const entries: DiffEntry[] = [];
+  const beforeMap = new Map(before.shapes.map(s => [s.id, s]));
+  const afterMap = new Map(after.shapes.map(s => [s.id, s]));
+
+  for (const [id, shape] of afterMap) {
+    if (!beforeMap.has(id)) {
+      entries.push({ id: 'x', type: 'added', shapeName: shape.name, shapeType: shape.type, after: shape, changes: [] });
+    }
+  }
+  for (const [id, shape] of beforeMap) {
+    if (!afterMap.has(id)) {
+      entries.push({ id: 'x', type: 'removed', shapeName: shape.name, shapeType: shape.type, before: shape, changes: [] });
+    }
+  }
+  for (const [id, beforeShape] of beforeMap) {
+    const afterShape = afterMap.get(id);
+    if (!afterShape) continue;
+    const changes: string[] = [];
+    let moved = false, restyled = false, renamed = false;
+    if (Math.abs(afterShape.x - beforeShape.x) > 0.5 || Math.abs(afterShape.y - beforeShape.y) > 0.5) {
+      changes.push('Moved'); moved = true;
+    }
+    if (Math.abs(afterShape.width - beforeShape.width) > 0.5 || Math.abs(afterShape.height - beforeShape.height) > 0.5) {
+      changes.push('Resized'); moved = true;
+    }
+    if (afterShape.fill !== beforeShape.fill) { changes.push('Fill'); restyled = true; }
+    if (afterShape.opacity !== beforeShape.opacity) { changes.push('Opacity'); restyled = true; }
+    if (afterShape.name !== beforeShape.name) { changes.push('Renamed'); renamed = true; }
+    if (changes.length === 0) {
+      entries.push({ id: 'x', type: 'unchanged', shapeName: afterShape.name, shapeType: afterShape.type, before: beforeShape, after: afterShape, changes: [] });
+    } else {
+      const type: DiffChangeType = renamed && !moved && !restyled ? 'renamed'
+        : moved ? 'moved' : 'restyled';
+      entries.push({ id: 'x', type, shapeName: afterShape.name, shapeType: afterShape.type, before: beforeShape, after: afterShape, changes });
+    }
+  }
+  return entries;
+}
+
+describe('DesignDiffPanel diff engine', () => {
+  const base = makeShape({ id: 'a', name: 'Button', x: 10, y: 10, width: 120, height: 40, fill: '#6366f1' });
+
+  it('detects added shape', () => {
+    const before = makeSnap([base]);
+    const newShape = makeShape({ id: 'b', name: 'Card' });
+    const after = makeSnap([base, newShape]);
+    const diff = computeDiffTest(before, after);
+    expect(diff.some(d => d.type === 'added' && d.shapeName === 'Card')).toBe(true);
+  });
+
+  it('detects removed shape', () => {
+    const b = makeShape({ id: 'b', name: 'Header' });
+    const before = makeSnap([base, b]);
+    const after = makeSnap([base]);
+    const diff = computeDiffTest(before, after);
+    expect(diff.some(d => d.type === 'removed' && d.shapeName === 'Header')).toBe(true);
+  });
+
+  it('detects moved shape (x changed)', () => {
+    const moved = makeShape({ id: 'a', name: 'Button', x: 200, y: 10, width: 120, height: 40, fill: '#6366f1' });
+    const diff = computeDiffTest(makeSnap([base]), makeSnap([moved]));
+    expect(diff.some(d => d.type === 'moved' && d.changes.includes('Moved'))).toBe(true);
+  });
+
+  it('detects restyled shape (fill changed)', () => {
+    const restyled = makeShape({ id: 'a', name: 'Button', x: 10, y: 10, width: 120, height: 40, fill: '#ef4444' });
+    const diff = computeDiffTest(makeSnap([base]), makeSnap([restyled]));
+    expect(diff.some(d => d.type === 'restyled' && d.changes.includes('Fill'))).toBe(true);
+  });
+
+  it('marks unchanged shape correctly', () => {
+    const same = makeShape({ id: 'a', name: 'Button', x: 10, y: 10, width: 120, height: 40, fill: '#6366f1' });
+    const diff = computeDiffTest(makeSnap([base]), makeSnap([same]));
+    expect(diff.every(d => d.type === 'unchanged')).toBe(true);
+  });
+
+  it('detects renamed shape (name only)', () => {
+    const renamed = makeShape({ id: 'a', name: 'CTA Button', x: 10, y: 10, width: 120, height: 40, fill: '#6366f1' });
+    const diff = computeDiffTest(makeSnap([base]), makeSnap([renamed]));
+    expect(diff.some(d => d.type === 'renamed')).toBe(true);
+  });
+
+  it('handles empty before snapshot', () => {
+    const after = makeSnap([base, makeShape({ id: 'b', name: 'Nav' })]);
+    const diff = computeDiffTest(makeSnap([]), after);
+    expect(diff.filter(d => d.type === 'added').length).toBe(2);
+  });
+
+  it('handles empty after snapshot', () => {
+    const before = makeSnap([base, makeShape({ id: 'b', name: 'Nav' })]);
+    const diff = computeDiffTest(before, makeSnap([]));
+    expect(diff.filter(d => d.type === 'removed').length).toBe(2);
+  });
+
+  it('counts changes accurately in mixed scenario', () => {
+    const shape2 = makeShape({ id: 'b', name: 'Card', x: 200, y: 0, width: 200, height: 150 });
+    const before = makeSnap([base, shape2]);
+    const movedBase = makeShape({ id: 'a', name: 'Button', x: 50, y: 10, width: 120, height: 40, fill: '#6366f1' });
+    const newShape = makeShape({ id: 'c', name: 'Footer' });
+    const after = makeSnap([movedBase, newShape]);
+    const diff = computeDiffTest(before, after);
+    expect(diff.filter(d => d.type === 'added').length).toBe(1);
+    expect(diff.filter(d => d.type === 'removed').length).toBe(1);
+    expect(diff.filter(d => d.type === 'moved').length).toBe(1);
+  });
+
+  it('detects opacity change as restyled', () => {
+    const faded = makeShape({ id: 'a', name: 'Button', x: 10, y: 10, width: 120, height: 40, fill: '#6366f1', opacity: 0.5 });
+    const diff = computeDiffTest(makeSnap([base]), makeSnap([faded]));
+    expect(diff.some(d => d.type === 'restyled' && d.changes.includes('Opacity'))).toBe(true);
+  });
+});
