@@ -3874,3 +3874,154 @@ describe('SnapGuideManagerPanel utilities', () => {
     expect(sgImportJSON('{"guides": "bad"}')).toBeNull();
   });
 });
+
+// ── DesignSystemHealthPanel ───────────────────────────────────────────────────
+
+// Inlined utilities from DesignSystemHealthPanel.tsx
+
+interface DSShape { id: string; type: string; x: number; y: number; width: number; height: number; fill?: string; stroke?: string; fontSize?: number; name?: string; }
+
+function dsNearestValue(value: number, allowed: number[]): number {
+  if (allowed.length === 0) return value;
+  return allowed.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
+}
+
+function dsIsOnScale(value: number, scale: number[], tolerance = 0.5): boolean {
+  return scale.some(s => Math.abs(s - value) <= tolerance);
+}
+
+function dsNormalizeHex(hex: string): string {
+  const clean = hex.replace('#', '').toLowerCase();
+  if (clean.length === 3) return '#' + clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2];
+  return '#' + clean.slice(0, 6);
+}
+
+function dsCollectColors(shapes: DSShape[]): string[] {
+  const colors = new Set<string>();
+  for (const s of shapes) {
+    if (s.fill && s.fill !== 'transparent' && s.fill.startsWith('#')) colors.add(dsNormalizeHex(s.fill));
+    if (s.stroke && s.stroke.startsWith('#')) colors.add(dsNormalizeHex(s.stroke));
+  }
+  return [...colors];
+}
+
+function dsCollectFontSizes(shapes: DSShape[]): number[] {
+  const sizes = new Set<number>();
+  for (const s of shapes) { if (s.fontSize) sizes.add(s.fontSize); }
+  return [...sizes].sort((a, b) => a - b);
+}
+
+interface DSViolation { id: string; shapeId: string; severity: 'error' | 'warning' | 'info'; rule: string; autoFixable: boolean; suggestedValue?: string; }
+
+function dsComputeHealthScore(violations: DSViolation[], shapeCount: number): number {
+  if (shapeCount === 0) return 100;
+  let penalty = 0;
+  for (const v of violations) { if (v.severity === 'error') penalty += 10; else if (v.severity === 'warning') penalty += 3; else penalty += 1; }
+  return Math.max(0, Math.min(100, 100 - penalty));
+}
+
+describe('DesignSystemHealthPanel utilities', () => {
+  // nearestValue
+  it('nearestValue: finds exact match', () => {
+    expect(dsNearestValue(8, [4, 8, 16])).toBe(8);
+  });
+
+  it('nearestValue: rounds to nearest', () => {
+    expect(dsNearestValue(7, [4, 8, 16])).toBe(8); // 7 is closer to 8 than 4
+  });
+
+  it('nearestValue: below minimum → minimum', () => {
+    expect(dsNearestValue(1, [4, 8, 16])).toBe(4);
+  });
+
+  it('nearestValue: empty allowed → returns value unchanged', () => {
+    expect(dsNearestValue(99, [])).toBe(99);
+  });
+
+  // isOnScale
+  it('isOnScale: exact match → true', () => {
+    expect(dsIsOnScale(8, [4, 8, 16])).toBe(true);
+  });
+
+  it('isOnScale: within tolerance → true', () => {
+    expect(dsIsOnScale(8.3, [8], 0.5)).toBe(true);
+  });
+
+  it('isOnScale: outside tolerance → false', () => {
+    expect(dsIsOnScale(9, [8], 0.5)).toBe(false);
+  });
+
+  it('isOnScale: empty scale → false', () => {
+    expect(dsIsOnScale(8, [])).toBe(false);
+  });
+
+  // normalizeHex
+  it('normalizeHex: 6-char hex → lowercase with #', () => {
+    expect(dsNormalizeHex('#FF0000')).toBe('#ff0000');
+  });
+
+  it('normalizeHex: 3-char shorthand → expanded', () => {
+    expect(dsNormalizeHex('#F00')).toBe('#ff0000');
+  });
+
+  // collectColors
+  it('collectColors: collects fill and stroke colors', () => {
+    const shapes: DSShape[] = [
+      { id: 'a', type: 'rect', x: 0, y: 0, width: 10, height: 10, fill: '#ff0000' },
+      { id: 'b', type: 'rect', x: 0, y: 0, width: 10, height: 10, stroke: '#00ff00' },
+    ];
+    const colors = dsCollectColors(shapes);
+    expect(colors).toContain('#ff0000');
+    expect(colors).toContain('#00ff00');
+  });
+
+  it('collectColors: deduplicates same color', () => {
+    const shapes: DSShape[] = [
+      { id: 'a', type: 'rect', x: 0, y: 0, width: 10, height: 10, fill: '#ff0000' },
+      { id: 'b', type: 'rect', x: 0, y: 0, width: 10, height: 10, fill: '#ff0000' },
+    ];
+    expect(dsCollectColors(shapes)).toHaveLength(1);
+  });
+
+  it('collectColors: skips transparent', () => {
+    const shapes: DSShape[] = [{ id: 'a', type: 'rect', x: 0, y: 0, width: 10, height: 10, fill: 'transparent' }];
+    expect(dsCollectColors(shapes)).toHaveLength(0);
+  });
+
+  // collectFontSizes
+  it('collectFontSizes: returns sorted unique sizes', () => {
+    const shapes: DSShape[] = [
+      { id: 'a', type: 'text', x: 0, y: 0, width: 100, height: 20, fontSize: 24 },
+      { id: 'b', type: 'text', x: 0, y: 0, width: 100, height: 20, fontSize: 16 },
+      { id: 'c', type: 'text', x: 0, y: 0, width: 100, height: 20, fontSize: 24 },
+    ];
+    const sizes = dsCollectFontSizes(shapes);
+    expect(sizes).toEqual([16, 24]);
+  });
+
+  // computeHealthScore
+  it('computeHealthScore: no violations → 100', () => {
+    expect(dsComputeHealthScore([], 5)).toBe(100);
+  });
+
+  it('computeHealthScore: no shapes → 100', () => {
+    expect(dsComputeHealthScore([], 0)).toBe(100);
+  });
+
+  it('computeHealthScore: errors reduce score more than warnings', () => {
+    const errors: DSViolation[] = [{ id: '1', shapeId: 'a', severity: 'error', rule: 'X', autoFixable: false }];
+    const warns: DSViolation[] = [{ id: '1', shapeId: 'a', severity: 'warning', rule: 'X', autoFixable: false }];
+    expect(dsComputeHealthScore(errors, 5)).toBeLessThan(dsComputeHealthScore(warns, 5));
+  });
+
+  it('computeHealthScore: score never below 0', () => {
+    const lots: DSViolation[] = Array.from({ length: 50 }, (_, i) => ({
+      id: String(i), shapeId: 'a', severity: 'error', rule: 'X', autoFixable: false,
+    }));
+    expect(dsComputeHealthScore(lots, 5)).toBe(0);
+  });
+
+  it('computeHealthScore: score never above 100', () => {
+    expect(dsComputeHealthScore([], 100)).toBe(100);
+  });
+});

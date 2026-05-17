@@ -137,6 +137,7 @@ import { MultiPagePanel } from './components/canvas/MultiPagePanel';
 import { VariableFontExplorerPanel } from './components/canvas/VariableFontExplorerPanel';
 import { BlendModesPanel } from './components/canvas/BlendModesPanel';
 import { SnapGuideManagerPanel } from './components/canvas/SnapGuideManagerPanel';
+import { DesignSystemHealthPanel } from './components/canvas/DesignSystemHealthPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -543,6 +544,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showVarFontExplorer, setShowVarFontExplorer] = useState(false);
   const [showBlendModes, setShowBlendModes] = useState(false);
   const [showSnapGuideManager, setShowSnapGuideManager] = useState(false);
+  const [showDesignSystemHealth, setShowDesignSystemHealth] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -927,7 +929,8 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowGridSystem(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowColorGrading(g => !g); return; }
             if (e.altKey) { e.preventDefault(); setShowAssetLibrary(v => !v); return; }
-            break;
+            // ⌘L = Design System Health Dashboard
+            e.preventDefault(); setShowDesignSystemHealth(v => !v); return;
           }
           // ── m — Snapshots / Morph blend / Minimap / Motion Preview ─────────
           case 'm': {
@@ -3027,6 +3030,20 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onClose={() => setShowSnapGuideManager(false)}
         canvasWidth={1440}
         canvasHeight={900}
+      />
+
+      {/* Design System Health Dashboard (⌘L) */}
+      <DesignSystemHealthPanel
+        open={showDesignSystemHealth}
+        onClose={() => setShowDesignSystemHealth(false)}
+        shapes={drawing.state.shapes}
+        onSelectShape={(id) => {
+          drawingRef.current.select(id);
+          showToast('Shape selected', 'action');
+        }}
+        onAutoFix={(shapeId, field, value) => {
+          drawingRef.current.updateShape(shapeId, { [field]: value } as any);
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
