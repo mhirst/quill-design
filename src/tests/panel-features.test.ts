@@ -5269,3 +5269,120 @@ describe('DesignTokenMapper', () => {
     expect(dtmFindBinding(bindings, 'sh1', 'fill')?.tokenId).toBe('c2');
   });
 });
+
+// ── ImageFilterStudio ─────────────────────────────────────────────────────────
+
+interface IfsConfig {
+  blur: number; brightness: number; contrast: number; saturation: number;
+  hueRotate: number; sepia: number; grayscale: number; invert: number;
+  opacity: number; dropShadowX: number; dropShadowY: number; dropShadowBlur: number;
+  dropShadowColor: string;
+}
+
+const IFS_DEFAULT: IfsConfig = {
+  blur: 0, brightness: 100, contrast: 100, saturation: 100,
+  hueRotate: 0, sepia: 0, grayscale: 0, invert: 0, opacity: 100,
+  dropShadowX: 0, dropShadowY: 0, dropShadowBlur: 0, dropShadowColor: '#000000',
+};
+
+function ifsBuildCSS(cfg: IfsConfig): string {
+  const parts: string[] = [];
+  if (cfg.blur !== 0) parts.push(`blur(${cfg.blur}px)`);
+  if (cfg.brightness !== 100) parts.push(`brightness(${cfg.brightness}%)`);
+  if (cfg.contrast !== 100) parts.push(`contrast(${cfg.contrast}%)`);
+  if (cfg.saturation !== 100) parts.push(`saturate(${cfg.saturation}%)`);
+  if (cfg.hueRotate !== 0) parts.push(`hue-rotate(${cfg.hueRotate}deg)`);
+  if (cfg.sepia !== 0) parts.push(`sepia(${cfg.sepia}%)`);
+  if (cfg.grayscale !== 0) parts.push(`grayscale(${cfg.grayscale}%)`);
+  if (cfg.invert !== 0) parts.push(`invert(${cfg.invert}%)`);
+  if (cfg.dropShadowBlur > 0 || cfg.dropShadowX !== 0 || cfg.dropShadowY !== 0)
+    parts.push(`drop-shadow(${cfg.dropShadowX}px ${cfg.dropShadowY}px ${cfg.dropShadowBlur}px ${cfg.dropShadowColor})`);
+  return parts.length === 0 ? 'none' : parts.join(' ');
+}
+
+function ifsIsDefault(cfg: IfsConfig): boolean {
+  return cfg.blur === 0 && cfg.brightness === 100 && cfg.contrast === 100 &&
+    cfg.saturation === 100 && cfg.hueRotate === 0 && cfg.sepia === 0 &&
+    cfg.grayscale === 0 && cfg.invert === 0 && cfg.opacity === 100;
+}
+
+function ifsDiffCount(cfg: IfsConfig): number {
+  return [
+    cfg.blur !== 0, cfg.brightness !== 100, cfg.contrast !== 100,
+    cfg.saturation !== 100, cfg.hueRotate !== 0, cfg.sepia !== 0,
+    cfg.grayscale !== 0, cfg.invert !== 0, cfg.opacity !== 100,
+    cfg.dropShadowBlur > 0 || cfg.dropShadowX !== 0 || cfg.dropShadowY !== 0,
+  ].filter(Boolean).length;
+}
+
+describe('ImageFilterStudio', () => {
+  it('buildFilterCSS: default config returns none', () => {
+    expect(ifsBuildCSS(IFS_DEFAULT)).toBe('none');
+  });
+
+  it('buildFilterCSS: blur only', () => {
+    const css = ifsBuildCSS({ ...IFS_DEFAULT, blur: 4 });
+    expect(css).toContain('blur(4px)');
+  });
+
+  it('buildFilterCSS: brightness only', () => {
+    const css = ifsBuildCSS({ ...IFS_DEFAULT, brightness: 150 });
+    expect(css).toContain('brightness(150%)');
+  });
+
+  it('buildFilterCSS: grayscale 100 is B&W', () => {
+    const css = ifsBuildCSS({ ...IFS_DEFAULT, grayscale: 100 });
+    expect(css).toContain('grayscale(100%)');
+    expect(css).not.toContain('blur');
+  });
+
+  it('buildFilterCSS: inverted returns invert(100%)', () => {
+    expect(ifsBuildCSS({ ...IFS_DEFAULT, invert: 100 })).toContain('invert(100%)');
+  });
+
+  it('buildFilterCSS: sepia filter', () => {
+    expect(ifsBuildCSS({ ...IFS_DEFAULT, sepia: 100 })).toContain('sepia(100%)');
+  });
+
+  it('buildFilterCSS: hue-rotate', () => {
+    expect(ifsBuildCSS({ ...IFS_DEFAULT, hueRotate: 180 })).toContain('hue-rotate(180deg)');
+  });
+
+  it('buildFilterCSS: drop-shadow included when blur > 0', () => {
+    const css = ifsBuildCSS({ ...IFS_DEFAULT, dropShadowBlur: 8, dropShadowColor: '#ff0000' });
+    expect(css).toContain('drop-shadow(0px 0px 8px #ff0000)');
+  });
+
+  it('buildFilterCSS: multiple filters combined', () => {
+    const css = ifsBuildCSS({ ...IFS_DEFAULT, blur: 2, contrast: 120, saturation: 150 });
+    expect(css).toContain('blur(2px)');
+    expect(css).toContain('contrast(120%)');
+    expect(css).toContain('saturate(150%)');
+  });
+
+  it('isDefault: default config is true', () => {
+    expect(ifsIsDefault(IFS_DEFAULT)).toBe(true);
+  });
+
+  it('isDefault: any change makes it false', () => {
+    expect(ifsIsDefault({ ...IFS_DEFAULT, blur: 1 })).toBe(false);
+  });
+
+  it('diffCount: default has 0 diffs', () => {
+    expect(ifsDiffCount(IFS_DEFAULT)).toBe(0);
+  });
+
+  it('diffCount: 2 changes = 2', () => {
+    expect(ifsDiffCount({ ...IFS_DEFAULT, blur: 3, contrast: 150 })).toBe(2);
+  });
+
+  it('presets: sepia preset has sepia=100', () => {
+    const sepia = { name: 'Sepia', config: { sepia: 100, contrast: 110, brightness: 90 } };
+    expect(sepia.config.sepia).toBe(100);
+  });
+
+  it('presets: B&W preset has grayscale=100', () => {
+    const bw = { name: 'B&W', config: { grayscale: 100 } };
+    expect(bw.config.grayscale).toBe(100);
+  });
+});

@@ -149,6 +149,7 @@ import { AccessibilityAuditorPanel } from './components/canvas/AccessibilityAudi
 import { EasingCurveEditor } from './components/canvas/EasingCurveEditor';
 import { DesignTokenMapper } from './components/canvas/DesignTokenMapper';
 import type { ShapeProperty } from './components/canvas/DesignTokenMapper';
+import { ImageFilterStudio } from './components/canvas/ImageFilterStudio';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -565,6 +566,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showA11yAudit, setShowA11yAudit] = useState(false);
   const [showEasingEditor, setShowEasingEditor] = useState(false);
   const [showTokenMapper, setShowTokenMapper] = useState(false);
+  const [showFilterStudio, setShowFilterStudio] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1155,6 +1157,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }
           // ── 0 — Component Analyzer ────────────────────────────────────────
           case '0': {
+            if (e.shiftKey) { e.preventDefault(); setShowFilterStudio(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowComponentAnalyzer(v => !v); return; }
             break;
           }
@@ -3145,6 +3148,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
       <EasingCurveEditor
         open={showEasingEditor}
         onClose={() => setShowEasingEditor(false)}
+      />
+
+      {/* Image Filter Studio (⌘⇧0) */}
+      <ImageFilterStudio
+        open={showFilterStudio}
+        onClose={() => setShowFilterStudio(false)}
       />
 
       {/* Design Token Mapper (⌘⌥U) */}
