@@ -5131,3 +5131,141 @@ describe('EasingCurveEditor', () => {
     expect(d).toBeCloseTo(1.5, 1);
   });
 });
+
+// ── DesignTokenMapper ─────────────────────────────────────────────────────────
+
+type DtmTokenCategory = 'color' | 'spacing' | 'typography' | 'border' | 'opacity';
+interface DtmToken { id: string; name: string; category: DtmTokenCategory; value: string | number; group?: string }
+interface DtmBinding { shapeId: string; property: string; tokenId: string }
+
+function dtmGetByCategory(tokens: DtmToken[], category: DtmTokenCategory): DtmToken[] {
+  return tokens.filter(t => t.category === category);
+}
+
+function dtmFindBinding(bindings: DtmBinding[], shapeId: string, property: string): DtmBinding | undefined {
+  return bindings.find(b => b.shapeId === shapeId && b.property === property);
+}
+
+function dtmCountBindings(bindings: DtmBinding[], shapeId: string): number {
+  return bindings.filter(b => b.shapeId === shapeId).length;
+}
+
+function dtmExportCSS(tokens: DtmToken[]): string {
+  const lines = [':root {'];
+  for (const t of tokens) {
+    const name = t.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const val = typeof t.value === 'number' ? `${t.value}px` : t.value;
+    lines.push(`  --dt-${name}: ${val};`);
+  }
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function dtmExportJSON(tokens: DtmToken[]): string {
+  const grouped: Record<string, Record<string, unknown>> = {};
+  for (const t of tokens) {
+    if (!grouped[t.category]) grouped[t.category] = {};
+    grouped[t.category][t.name] = { value: t.value, type: t.category };
+  }
+  return JSON.stringify(grouped, null, 2);
+}
+
+const dtmTokens: DtmToken[] = [
+  { id: 'c1', name: 'Primary', category: 'color', value: '#6366f1', group: 'Brand' },
+  { id: 'c2', name: 'Secondary', category: 'color', value: '#ec4899', group: 'Brand' },
+  { id: 's1', name: 'md', category: 'spacing', value: 16, group: 'Scale' },
+  { id: 's2', name: 'lg', category: 'spacing', value: 24, group: 'Scale' },
+  { id: 't1', name: 'text-base', category: 'typography', value: 16, group: 'Size' },
+];
+
+describe('DesignTokenMapper', () => {
+  it('getByCategory: filters color tokens', () => {
+    const colors = dtmGetByCategory(dtmTokens, 'color');
+    expect(colors).toHaveLength(2);
+    expect(colors.every(t => t.category === 'color')).toBe(true);
+  });
+
+  it('getByCategory: filters spacing tokens', () => {
+    const spacing = dtmGetByCategory(dtmTokens, 'spacing');
+    expect(spacing).toHaveLength(2);
+  });
+
+  it('getByCategory: returns empty for unknown category', () => {
+    expect(dtmGetByCategory(dtmTokens, 'opacity')).toHaveLength(0);
+  });
+
+  it('findBinding: finds existing binding', () => {
+    const bindings: DtmBinding[] = [{ shapeId: 'sh1', property: 'fill', tokenId: 'c1' }];
+    expect(dtmFindBinding(bindings, 'sh1', 'fill')).toBeDefined();
+  });
+
+  it('findBinding: returns undefined for missing binding', () => {
+    const bindings: DtmBinding[] = [{ shapeId: 'sh1', property: 'fill', tokenId: 'c1' }];
+    expect(dtmFindBinding(bindings, 'sh1', 'stroke')).toBeUndefined();
+  });
+
+  it('countBindings: counts all bindings for a shape', () => {
+    const bindings: DtmBinding[] = [
+      { shapeId: 'sh1', property: 'fill', tokenId: 'c1' },
+      { shapeId: 'sh1', property: 'stroke', tokenId: 'c2' },
+      { shapeId: 'sh2', property: 'fill', tokenId: 'c1' },
+    ];
+    expect(dtmCountBindings(bindings, 'sh1')).toBe(2);
+    expect(dtmCountBindings(bindings, 'sh2')).toBe(1);
+    expect(dtmCountBindings(bindings, 'sh3')).toBe(0);
+  });
+
+  it('exportCSS: generates :root block', () => {
+    const css = dtmExportCSS(dtmTokens);
+    expect(css).toContain(':root {');
+    expect(css).toContain('}');
+  });
+
+  it('exportCSS: includes token as CSS variable', () => {
+    const css = dtmExportCSS([{ id: 'x', name: 'Primary', category: 'color', value: '#6366f1' }]);
+    expect(css).toContain('--dt-primary: #6366f1');
+  });
+
+  it('exportCSS: spacing values get px suffix', () => {
+    const css = dtmExportCSS([{ id: 'x', name: 'md', category: 'spacing', value: 16 }]);
+    expect(css).toContain('--dt-md: 16px');
+  });
+
+  it('exportCSS: replaces spaces in name with hyphens', () => {
+    const css = dtmExportCSS([{ id: 'x', name: 'Dark Blue', category: 'color', value: '#1a2e5a' }]);
+    expect(css).toContain('--dt-dark-blue:');
+  });
+
+  it('exportJSON: groups by category', () => {
+    const json = JSON.parse(dtmExportJSON(dtmTokens));
+    expect(json.color).toBeDefined();
+    expect(json.spacing).toBeDefined();
+    expect(json.color['Primary'].value).toBe('#6366f1');
+  });
+
+  it('exportJSON: includes type field', () => {
+    const json = JSON.parse(dtmExportJSON(dtmTokens));
+    expect(json.color['Primary'].type).toBe('color');
+  });
+
+  it('tokens: can add new token to array', () => {
+    const newToken: DtmToken = { id: 'new1', name: 'Custom Blue', category: 'color', value: '#0000ff' };
+    const updated = [...dtmTokens, newToken];
+    expect(updated).toHaveLength(dtmTokens.length + 1);
+    expect(updated.find(t => t.id === 'new1')).toBeDefined();
+  });
+
+  it('tokens: can remove token from array', () => {
+    const filtered = dtmTokens.filter(t => t.id !== 'c1');
+    expect(filtered).toHaveLength(dtmTokens.length - 1);
+    expect(filtered.find(t => t.id === 'c1')).toBeUndefined();
+  });
+
+  it('bindings: can update binding for same shape+property', () => {
+    let bindings: DtmBinding[] = [{ shapeId: 'sh1', property: 'fill', tokenId: 'c1' }];
+    const newTokenId = 'c2';
+    bindings = bindings.filter(b => !(b.shapeId === 'sh1' && b.property === 'fill'));
+    bindings.push({ shapeId: 'sh1', property: 'fill', tokenId: newTokenId });
+    expect(dtmFindBinding(bindings, 'sh1', 'fill')?.tokenId).toBe('c2');
+  });
+});

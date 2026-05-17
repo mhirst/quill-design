@@ -147,6 +147,8 @@ import type { IconDef } from './components/canvas/IconSearchPanel';
 import { CSSGridVisualizerPanel } from './components/canvas/CSSGridVisualizerPanel';
 import { AccessibilityAuditorPanel } from './components/canvas/AccessibilityAuditorPanel';
 import { EasingCurveEditor } from './components/canvas/EasingCurveEditor';
+import { DesignTokenMapper } from './components/canvas/DesignTokenMapper';
+import type { ShapeProperty } from './components/canvas/DesignTokenMapper';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -562,6 +564,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showCSSGrid, setShowCSSGrid] = useState(false);
   const [showA11yAudit, setShowA11yAudit] = useState(false);
   const [showEasingEditor, setShowEasingEditor] = useState(false);
+  const [showTokenMapper, setShowTokenMapper] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1016,6 +1019,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           case 'u': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowVarFontExplorer(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowUIBlocks(b => !b); return; }
+            if (e.altKey) { e.preventDefault(); setShowTokenMapper(v => !v); return; }
             break;
           }
           // ── v — Paste / Variable font / Variants ──────────────────────────
@@ -3141,6 +3145,16 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
       <EasingCurveEditor
         open={showEasingEditor}
         onClose={() => setShowEasingEditor(false)}
+      />
+
+      {/* Design Token Mapper (⌘⌥U) */}
+      <DesignTokenMapper
+        open={showTokenMapper}
+        onClose={() => setShowTokenMapper(false)}
+        shapes={drawing.state.shapes}
+        onApplyToken={(shapeId, property: ShapeProperty, value) => {
+          drawingRef.current.updateShape(shapeId, { [property]: value });
+        }}
       />
 
 
