@@ -104,6 +104,7 @@ import { SmartRenamePanel } from './components/canvas/SmartRenamePanel';
 import { CanvasComparePanel } from './components/canvas/CanvasComparePanel';
 import { MotionPreviewPanel } from './components/canvas/MotionPreviewPanel';
 import { MoodboardPanel, type MoodTheme } from './components/canvas/MoodboardPanel';
+import { TypographySpecimenPanel } from './components/canvas/TypographySpecimenPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -477,6 +478,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showCanvasCompare, setShowCanvasCompare] = useState(false);
   const [showMotionPreview, setShowMotionPreview] = useState(false);
   const [showMoodboard, setShowMoodboard] = useState(false);
+  const [showTypographySpecimen, setShowTypographySpecimen] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -969,9 +971,10 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowAccessibility(a => !a); return; }
             break;
           }
-          // ── y — Color harmony / Redo ───────────────────────────────────────
+          // ── y — Color harmony / Typography Specimen / Redo ────────────────
           case 'y': {
             e.preventDefault();
+            if (e.shiftKey && e.altKey) { setShowTypographySpecimen(v => !v); return; }
             if (e.shiftKey) { setShowColorHarmony(o => !o); return; }
             drawingRef.current.redo(); showToast('Redo', 'action'); return;
           }
@@ -2490,6 +2493,23 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             });
           });
           showToast(`Generated ${theme.name} moodboard`, 'action');
+        }}
+      />
+
+      {/* Typography Specimen Panel (⌘⇧⌥Y) */}
+      <TypographySpecimenPanel
+        open={showTypographySpecimen}
+        onClose={() => setShowTypographySpecimen(false)}
+        selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+        onApplyFont={(fontFamily, fontWeight) => {
+          const id = drawing.state.selectedId;
+          if (id) {
+            drawingRef.current.updateShape(id, {
+              fontFamily,
+              ...(fontWeight ? { fontWeight: String(fontWeight) } : {}),
+            });
+            showToast(`Font: ${fontFamily}`, 'action');
+          }
         }}
       />
 
