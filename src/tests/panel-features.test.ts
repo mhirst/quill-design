@@ -2372,3 +2372,92 @@ describe('TypographyAuditPanel utilities', () => {
     expect(auditTypographyTest([])).toHaveLength(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ShapeMorphPanel — inlined interpolation utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+function lerpTest(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function blendHexTest(hexA: string, hexB: string, t: number): string {
+  const parse = (h: string): [number, number, number] => {
+    const c = h.replace(/^#/, '');
+    const full = c.length === 3 ? c.split('').map(x => x + x).join('') : c.padEnd(6, '0').slice(0, 6);
+    return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16)];
+  };
+  const [r1, g1, b1] = parse(hexA || '#000000');
+  const [r2, g2, b2] = parse(hexB || '#ffffff');
+  const r = Math.round(lerpTest(r1, r2, t));
+  const g = Math.round(lerpTest(g1, g2, t));
+  const b = Math.round(lerpTest(b1, b2, t));
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function applyEasingTest(t: number, easing: string): number {
+  switch (easing) {
+    case 'ease-in': return t * t;
+    case 'ease-out': return 1 - (1 - t) * (1 - t);
+    case 'ease-in-out': return t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+    default: return t;
+  }
+}
+
+describe('ShapeMorphPanel interpolation utilities', () => {
+  // lerp
+  it('lerp: t=0 → a', () => { expect(lerpTest(10, 20, 0)).toBe(10); });
+  it('lerp: t=1 → b', () => { expect(lerpTest(10, 20, 1)).toBe(20); });
+  it('lerp: t=0.5 → midpoint', () => { expect(lerpTest(0, 100, 0.5)).toBe(50); });
+  it('lerp: negative values', () => { expect(lerpTest(-10, 10, 0.5)).toBe(0); });
+
+  // blendHex
+  it('blendHex: t=0 → hexA', () => {
+    expect(blendHexTest('#ff0000', '#0000ff', 0)).toBe('#ff0000');
+  });
+
+  it('blendHex: t=1 → hexB', () => {
+    expect(blendHexTest('#ff0000', '#0000ff', 1)).toBe('#0000ff');
+  });
+
+  it('blendHex: t=0.5 between white and black → mid gray', () => {
+    const mid = blendHexTest('#ffffff', '#000000', 0.5);
+    expect(mid).toBe('#808080');
+  });
+
+  it('blendHex: result is valid 7-char hex', () => {
+    const result = blendHexTest('#ff8800', '#003399', 0.3);
+    expect(result).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  // applyEasing
+  it('applyEasing linear: returns t unchanged', () => {
+    expect(applyEasingTest(0.5, 'linear')).toBeCloseTo(0.5, 5);
+  });
+
+  it('applyEasing ease-in: t=0.5 < 0.5 (slower start)', () => {
+    expect(applyEasingTest(0.5, 'ease-in')).toBeCloseTo(0.25, 5);
+  });
+
+  it('applyEasing ease-out: t=0.5 > 0.5 (faster start)', () => {
+    expect(applyEasingTest(0.5, 'ease-out')).toBeCloseTo(0.75, 5);
+  });
+
+  it('applyEasing ease-in-out: symmetric around 0.5', () => {
+    const a = applyEasingTest(0.25, 'ease-in-out');
+    const b = 1 - applyEasingTest(0.75, 'ease-in-out');
+    expect(a).toBeCloseTo(b, 5);
+  });
+
+  it('applyEasing: t=0 → 0 for all easings', () => {
+    ['linear', 'ease-in', 'ease-out', 'ease-in-out'].forEach(e => {
+      expect(applyEasingTest(0, e)).toBeCloseTo(0, 5);
+    });
+  });
+
+  it('applyEasing: t=1 → 1 for all easings', () => {
+    ['linear', 'ease-in', 'ease-out', 'ease-in-out'].forEach(e => {
+      expect(applyEasingTest(1, e)).toBeCloseTo(1, 5);
+    });
+  });
+});
