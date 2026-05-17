@@ -730,65 +730,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
 
       if (mod) {
         switch (e.key.toLowerCase()) {
-          case 'k': e.preventDefault(); setCommandPaletteOpen(o => !o); return;
-          case 'd': if (e.shiftKey) { e.preventDefault(); setShowDesignSystem(o => !o); return; } break;
-          case 'r':
-            if (e.shiftKey) { e.preventDefault(); setShowColorReplace(o => !o); return; }
-            if (!e.shiftKey && !e.altKey) { e.preventDefault(); setShowRulers(r => !r); return; }
-            break;
-          case 'h': if (e.shiftKey) { e.preventDefault(); setShowFindReplace(o => !o); return; } break;
-          case 't':
-            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowTemplateGallery(v => !v); return; }
-            if (e.shiftKey && !e.altKey) { e.preventDefault(); setShowTypeScale(o => !o); return; }
-            if (e.altKey && !e.shiftKey) { e.preventDefault(); drawingRef.current.tidyUp(); showToast('Tidy up', 'action'); return; }
-            break;
-          case 'y': if (e.shiftKey) { e.preventDefault(); setShowColorHarmony(o => !o); return; } break;
-          case 'p': if (e.shiftKey) { e.preventDefault(); setShowThemeCustomizer(o => !o); return; } break;
-          case 'e': if (e.shiftKey) { e.preventDefault(); setShowDevSpec(o => !o); return; } break;
-          case 'f':
-            if (e.shiftKey) { e.preventDefault(); setShowCustomFonts(o => !o); return; }
-            e.preventDefault(); setShowSpotlight(o => !o); return;
-          case 'm': if (e.shiftKey) { e.preventDefault(); setShowSnapshots(o => !o); return; } break;
-          case 'h': if (e.altKey) { e.preventDefault(); setShowHistoryBrowser(o => !o); return; } break;
-          case 'b': if (e.shiftKey) { e.preventDefault(); setShowBatchRename(o => !o); return; } break;
-          case 's': if (e.altKey) { e.preventDefault(); setShowFrameSorter(o => !o); return; } break;
-          case '/': if (e.shiftKey) { e.preventDefault(); setShowCodeExport(o => !o); return; } break;
-          case 'o': if (e.shiftKey) { e.preventDefault(); setShowColorScheme(o => !o); return; } break;
-          case 's': e.preventDefault(); if (e.shiftKey) handleSaveAsRef.current(); else handleSaveRef.current(); return;
-          case 'n': e.preventDefault(); if (e.shiftKey) { setCommentMode(m => !m); return; } handleNewDocRef.current(); return;
-          case 'j': if (e.shiftKey) { e.preventDefault(); startStickyNote(); showToast('Click canvas to place a sticky note', 'info'); return; } break;
-          case 'k': if (e.shiftKey) { e.preventDefault(); setAnnotationsActive(a => !a); showToast(annotationsActive ? 'Annotations off' : 'Annotation mode — click canvas to add', 'info'); return; } break;
-          case 'i': if (e.shiftKey) { e.preventDefault(); setShowImageFill(i => !i); return; } break;
-          case 'l': if (e.shiftKey) { e.preventDefault(); setShowColorGrading(g => !g); return; } break;
-          case 'p': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowParticles(p => !p); return; } break;
-          case 'w': if (e.shiftKey) { e.preventDefault(); setShowShadowStudio(s => !s); return; } break;
-          case 'u': if (e.shiftKey) { e.preventDefault(); setShowUIBlocks(b => !b); return; } break;
-          case 'f': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowFluidType(f => !f); return; } break;
-          case 'q': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowClipPath(c => !c); return; } break;
-          case 'x': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowAccessibility(a => !a); return; } break;
-          case 'd': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowDesignTokens(t => !t); return; } break;
-          case 'e': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowBatchExport(b => !b); return; } break;
-          case 'b': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPatternFill(p => !p); return; } break;
-          case 'm': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMorphBlend(m => !m); return; } break;
-          case 'r': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowResponsivePreview(r => !r); return; } break;
-          /* 't' key handled in first case 't' block above */
-          case 'h': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPlaceholder(h => !h); return; } break;
-          case '3': if (e.shiftKey && e.altKey) { e.preventDefault(); setShow3DTransform(v => !v); return; } break;
-          case 'n': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowNoiseTexture(v => !v); return; } break;
-          case 'v': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowVariableFont(v => !v); return; } break;
-          case 'w': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowVariants(v => !v); return; } break;
-          case 'i': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowDesignIntel(v => !v); return; } break;
-          case 'g': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowGenerativeArt(v => !v); return; } break;
-          case 'l': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowGridSystem(v => !v); return; } break;
-          case 'p': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPrototype(v => !v); return; } break;
-          case 'c': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowContentFill(v => !v); return; } break;
-          case 'b': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowColorBlind(v => !v); return; } break;
-          /* 't' key (metaKey+shift) → TextStyles handled in first case 't' */
-          case 'e': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPaletteExtractor(v => !v); return; } break;
-          case 'j': if (e.shiftKey && e.altKey) { e.preventDefault(); setShowLayerEffects(v => !v); return; } break;
-          case 'm': if (e.metaKey && !e.shiftKey && !e.altKey) { e.preventDefault(); setShowMinimap(v => !v); return; } break;
-          case 'd': if (e.metaKey && !e.shiftKey && !e.altKey) { e.preventDefault(); setShowRedlines(v => !v); return; } break;
-          case 'F5': { e.preventDefault(); const startId = drawing.state.selectedId || null; setPresentationStartId(startId); setShowPresentation(true); return; }
+          // ── a — Select all / Auto layout / Animation / Motion path ─────────
           case 'a': {
             e.preventDefault();
             if (e.shiftKey && e.altKey) { setShowMotionPath(m => !m); return; }
@@ -796,12 +738,17 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { setShowAnimationTween(a => !a); return; }
             const d = drawingRef.current; if (d.state.shapes.length === 0) return; d.selectAll(); setActiveTool('cursor'); return;
           }
-          case 'g': e.preventDefault(); if (e.altKey) { drawingRef.current.wrapInFrame(); return; } if (e.shiftKey) drawingRef.current.ungroup(); else drawingRef.current.group(); return;
-          /* 't' key (altKey) → tidyUp handled in first case 't' */
-          case 'z': e.preventDefault(); if (e.shiftKey) { drawingRef.current.redo(); showToast('Redo', 'action'); } else { drawingRef.current.undo(); showToast('Undo', 'action'); } return;
-          case 'y': e.preventDefault(); if (e.shiftKey) { setShowStylePresets(p => !p); return; } drawingRef.current.redo(); showToast('Redo', 'action'); return;
+          // ── b — Batch rename / Pattern fill / Color blind ─────────────────
+          // ⌘⇧⌥B = Pattern Fill, ⌘⇧B = Batch Rename
+          case 'b': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPatternFill(p => !p); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowBatchRename(o => !o); return; }
+            break;
+          }
+          // ── c — Copy / Center / Content fill ──────────────────────────────
           case 'c': {
             e.preventDefault();
+            if (e.shiftKey && e.altKey) { setShowContentFill(v => !v); return; }
             if (e.altKey) { drawingRef.current.centerOnCanvas(); showToast('Centered on canvas', 'action'); return; }
             drawingRef.current.copy();
             const { selectedIds, selectedId, shapes } = drawingRef.current.state;
@@ -809,14 +756,129 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (copyCount > 0) showToast(copyCount === 1 ? `Copied "${shapes.find(s => s.id === selectedId)?.name ?? 'shape'}"` : `Copied ${copyCount} shapes`, 'action');
             return;
           }
+          // ── d — Duplicate / Design system / Design tokens / Redlines ───────
+          case 'd': {
+            e.preventDefault();
+            if (e.shiftKey && e.altKey) { setShowDesignTokens(t => !t); return; }
+            if (e.shiftKey) { setShowDesignSystem(o => !o); return; }
+            if (e.altKey) { setShowRedlines(v => !v); return; }
+            const { selectedIds: dIds, selectedId: dId, shapes: dShapes } = drawingRef.current.state;
+            const dupCount = dIds.length > 1 ? dIds.length : (dId ? 1 : 0);
+            drawingRef.current.duplicate();
+            if (dupCount > 0) showToast(dupCount === 1 ? `Duplicated "${dShapes.find(s => s.id === dId)?.name ?? 'shape'}"` : `Duplicated ${dupCount} shapes`, 'action');
+            return;
+          }
+          // ── e — Dev spec / Batch export / Palette extractor ───────────────
+          // ⌘⇧⌥E = Batch Export, ⌘⇧E = Dev Spec (⌘E = nothing)
+          case 'e': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowBatchExport(b => !b); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowDevSpec(o => !o); return; }
+            break;
+          }
+          // ── f — Spotlight / Custom fonts / Fluid type ─────────────────────
+          case 'f': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowFluidType(f => !f); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowCustomFonts(o => !o); return; }
+            e.preventDefault(); setShowSpotlight(o => !o); return;
+          }
+          // ── g — Group / Ungroup / Generative art / Wrap in frame ──────────
+          case 'g': {
+            e.preventDefault();
+            if (e.shiftKey && e.altKey) { setShowGenerativeArt(v => !v); return; }
+            if (e.altKey) { drawingRef.current.wrapInFrame(); return; }
+            if (e.shiftKey) { drawingRef.current.ungroup(); return; }
+            drawingRef.current.group(); return;
+          }
+          // ── h — Find & replace / History browser / Placeholder ────────────
+          case 'h': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPlaceholder(h => !h); return; }
+            if (e.altKey) { e.preventDefault(); setShowHistoryBrowser(o => !o); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowFindReplace(o => !o); return; }
+            break;
+          }
+          // ── i — Image fill / Design intel ─────────────────────────────────
+          case 'i': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowDesignIntel(v => !v); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowImageFill(i => !i); return; }
+            break;
+          }
+          // ── j — Layer effects / Sticky notes ──────────────────────────────
+          case 'j': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowLayerEffects(v => !v); return; }
+            if (e.shiftKey) { e.preventDefault(); startStickyNote(); showToast('Click canvas to place a sticky note', 'info'); return; }
+            break;
+          }
+          // ── k — Command palette / Annotations ─────────────────────────────
+          case 'k': {
+            if (e.shiftKey) { e.preventDefault(); setAnnotationsActive(a => !a); showToast(annotationsActive ? 'Annotations off' : 'Annotation mode — click canvas to add', 'info'); return; }
+            e.preventDefault(); setCommandPaletteOpen(o => !o); return;
+          }
+          // ── l — Color grading / Grid system ───────────────────────────────
+          case 'l': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowGridSystem(v => !v); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowColorGrading(g => !g); return; }
+            break;
+          }
+          // ── m — Snapshots / Morph blend / Minimap ─────────────────────────
+          case 'm': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMorphBlend(m => !m); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowSnapshots(o => !o); return; }
+            if (e.altKey) { e.preventDefault(); setShowMinimap(v => !v); return; }
+            break;
+          }
+          // ── n — New doc / Comments / Noise texture ────────────────────────
+          case 'n': {
+            e.preventDefault();
+            if (e.shiftKey && e.altKey) { setShowNoiseTexture(v => !v); return; }
+            if (e.shiftKey) { setCommentMode(m => !m); return; }
+            handleNewDocRef.current(); return;
+          }
+          // ── o — Color scheme ──────────────────────────────────────────────
+          case 'o': {
+            if (e.shiftKey) { e.preventDefault(); setShowColorScheme(o => !o); return; }
+            break;
+          }
+          // ── p — Theme customizer / Particles / Prototype ──────────────────
+          case 'p': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPrototype(v => !v); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowThemeCustomizer(o => !o); return; }
+            break;
+          }
+          // ── q — Clip path editor ──────────────────────────────────────────
+          case 'q': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowClipPath(c => !c); return; }
+            break;
+          }
+          // ── r — Color replace / Rulers / Responsive preview ───────────────
+          case 'r': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowResponsivePreview(r => !r); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowColorReplace(o => !o); return; }
+            e.preventDefault(); setShowRulers(r => !r); return;
+          }
+          // ── s — Save / Frame sorter ───────────────────────────────────────
+          case 's': {
+            e.preventDefault();
+            if (e.altKey) { setShowFrameSorter(o => !o); return; }
+            if (e.shiftKey) { handleSaveAsRef.current(); return; }
+            handleSaveRef.current(); return;
+          }
+          // ── t — Type scale / Template gallery / Tidy up / Text styles ─────
+          case 't': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowTemplateGallery(v => !v); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowTypeScale(o => !o); return; }
+            if (e.altKey) { e.preventDefault(); drawingRef.current.tidyUp(); showToast('Tidy up', 'action'); return; }
+            break;
+          }
+          // ── u — UI blocks ─────────────────────────────────────────────────
+          case 'u': {
+            if (e.shiftKey) { e.preventDefault(); setShowUIBlocks(b => !b); return; }
+            break;
+          }
+          // ── v — Paste / Variable font / Variants ──────────────────────────
           case 'v': {
             e.preventDefault();
-            // Cmd+Shift+V = Paste in Place (same position, no offset)
-            if (e.shiftKey) {
-              drawingRef.current.pasteInPlace();
-              showToast('Pasted in place', 'action');
-              return;
-            }
+            if (e.shiftKey && e.altKey) { setShowVariableFont(v => !v); return; }
+            if (e.shiftKey) { drawingRef.current.pasteInPlace(); showToast('Pasted in place', 'action'); return; }
             // Try to paste image from clipboard first (if clipboard has image items)
             navigator.clipboard.read().then(items => {
               for (const item of items) {
@@ -850,24 +912,49 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
                   return; // handled as image
                 }
               }
-              // No image — fall through to shape paste
               drawingRef.current.paste();
               showToast('Pasted', 'action');
             }).catch(() => {
-              // Clipboard API not available or denied — fall back to shape paste
               drawingRef.current.paste();
               showToast('Pasted', 'action');
             });
             return;
           }
-          case 'd': {
+          // ── w — Shadow studio / Variants ──────────────────────────────────
+          case 'w': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowVariants(v => !v); return; }
+            if (e.shiftKey) { e.preventDefault(); setShowShadowStudio(s => !s); return; }
+            break;
+          }
+          // ── x — Accessibility ─────────────────────────────────────────────
+          case 'x': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowAccessibility(a => !a); return; }
+            break;
+          }
+          // ── y — Color harmony / Redo ───────────────────────────────────────
+          case 'y': {
             e.preventDefault();
-            const { selectedIds: dIds, selectedId: dId, shapes: dShapes } = drawingRef.current.state;
-            const dupCount = dIds.length > 1 ? dIds.length : (dId ? 1 : 0);
-            drawingRef.current.duplicate();
-            if (dupCount > 0) showToast(dupCount === 1 ? `Duplicated "${dShapes.find(s => s.id === dId)?.name ?? 'shape'}"` : `Duplicated ${dupCount} shapes`, 'action');
+            if (e.shiftKey) { setShowColorHarmony(o => !o); return; }
+            drawingRef.current.redo(); showToast('Redo', 'action'); return;
+          }
+          // ── z — Undo / Redo ───────────────────────────────────────────────
+          case 'z': {
+            e.preventDefault();
+            if (e.shiftKey) { drawingRef.current.redo(); showToast('Redo', 'action'); }
+            else { drawingRef.current.undo(); showToast('Undo', 'action'); }
             return;
           }
+          // ── / — Code export ───────────────────────────────────────────────
+          case '/': {
+            if (e.shiftKey) { e.preventDefault(); setShowCodeExport(o => !o); return; }
+            break;
+          }
+          // ── 3 — 3D Transform ──────────────────────────────────────────────
+          case '3': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShow3DTransform(v => !v); return; }
+            break;
+          }
+          // ── ] [ — Z-order ─────────────────────────────────────────────────
           case ']': e.preventDefault(); drawingRef.current.bringToFront(); return;
           case '[': e.preventDefault(); drawingRef.current.sendToBack(); return;
         }
