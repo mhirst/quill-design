@@ -301,6 +301,22 @@ export function CanvasOverlay({
   const penDraggingPointRef = useRef(false);
   penDraggingPointRef.current = penDragPointIndex !== null;
 
+  // ── Stable refs for nudge (arrow keys) ────────────────────────────────────
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+  const shapesRef = useRef(shapes);
+  shapesRef.current = shapes;
+  const onShapeChangeRef = useRef(onShapeChange);
+  onShapeChangeRef.current = onShapeChange;
+  const onShapePreviewRef = useRef(onShapePreview);
+  onShapePreviewRef.current = onShapePreview;
+  // Tracks accumulated nudge delta per shape id: { id -> { x, y } }
+  // We accumulate on keydown (preview), then commit final position on keyup
+  const nudgeAccRef = useRef<Map<string, { baseX: number; baseY: number; dx: number; dy: number }>>(new Map());
+  const nudgePendingRef = useRef(false);
+
   // Committed path point dragging (cursor tool, editing existing path nodes)
   const pathPointDragRef = useRef<{ shapeId: string; pointIndex: number; points: import('../../lib/shapes').BezierPoint[] } | null>(null);
 
@@ -808,6 +824,33 @@ export function CanvasOverlay({
       }
 
       const mod = e.metaKey || e.ctrlKey;
+
+      // ── Arrow-key nudge ──────────────────────────────────────────────────────
+      if (!mod && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        const ids = selectedIdsRef.current.length > 0 ? selectedIdsRef.current : (selectedIdRef.current ? [selectedIdRef.current] : []);
+        if (ids.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          const delta = e.shiftKey ? 10 : 1;
+          const dx = e.key === 'ArrowLeft' ? -delta : e.key === 'ArrowRight' ? delta : 0;
+          const dy = e.key === 'ArrowUp' ? -delta : e.key === 'ArrowDown' ? delta : 0;
+          for (const id of ids) {
+            const s = shapesRef.current.find(sh => sh.id === id);
+            if (!s) continue;
+            // On first keydown for this shape, record base position
+            if (!nudgeAccRef.current.has(id)) {
+              nudgeAccRef.current.set(id, { baseX: s.x, baseY: s.y, dx: 0, dy: 0 });
+            }
+            const acc = nudgeAccRef.current.get(id)!;
+            acc.dx += dx;
+            acc.dy += dy;
+            onShapePreviewRef.current?.(id, { x: acc.baseX + acc.dx, y: acc.baseY + acc.dy });
+          }
+          nudgePendingRef.current = true;
+          return;
+        }
+      }
+
       // Zoom shortcuts (no modifier needed, like Figma)
       if (!mod) {
         if (e.key === '=' || e.key === '+') {
@@ -829,6 +872,14 @@ export function CanvasOverlay({
       if (e.code === 'Space') {
         spaceDownRef.current = false;
         if (overlayRef.current) overlayRef.current.style.cursor = '';
+      }
+      // Commit nudge to history when arrow key released
+      if (nudgePendingRef.current && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        nudgePendingRef.current = false;
+        for (const [id, acc] of nudgeAccRef.current.entries()) {
+          onShapeChangeRef.current?.(id, { x: acc.baseX + acc.dx, y: acc.baseY + acc.dy });
+        }
+        nudgeAccRef.current.clear();
       }
     };
     // Use capture:true so this fires before App.tsx's keydown handler, allowing stopImmediatePropagation
