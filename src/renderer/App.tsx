@@ -105,6 +105,7 @@ import { CanvasComparePanel } from './components/canvas/CanvasComparePanel';
 import { MotionPreviewPanel } from './components/canvas/MotionPreviewPanel';
 import { MoodboardPanel, type MoodTheme } from './components/canvas/MoodboardPanel';
 import { TypographySpecimenPanel } from './components/canvas/TypographySpecimenPanel';
+import { BreakpointRulerOverlay } from './components/canvas/BreakpointRulerOverlay';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -479,6 +480,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showMotionPreview, setShowMotionPreview] = useState(false);
   const [showMoodboard, setShowMoodboard] = useState(false);
   const [showTypographySpecimen, setShowTypographySpecimen] = useState(false);
+  const [showBreakpointRuler, setShowBreakpointRuler] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -842,8 +844,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowAIQuickStyles(v => !v); return; }
             e.preventDefault(); startStickyNote(); showToast('Click canvas to place a sticky note', 'info'); return;
           }
-          // ── k — Command palette / Annotations ─────────────────────────────
+          // ── k — Command palette / Annotations / Breakpoint Ruler ──────────
           case 'k': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowBreakpointRuler(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setAnnotationsActive(a => !a); showToast(annotationsActive ? 'Annotations off' : 'Annotation mode — click canvas to add', 'info'); return; }
             e.preventDefault(); setCommandPaletteOpen(o => !o); return;
           }
@@ -2112,6 +2115,15 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             canvasWidth={canvasSize.width}
             canvasHeight={canvasSize.height}
             active={showLayoutInspector}
+          />
+
+          {/* Breakpoint Ruler Overlay (⌘⇧⌥K) */}
+          <BreakpointRulerOverlay
+            open={showBreakpointRuler}
+            zoom={viewport.zoom}
+            panX={viewport.panX}
+            canvasWidth={canvasSize.width}
+            canvasHeight={canvasSize.height}
           />
 
           {/* Focus Mode — dims canvas except selected shapes (⌘⇧F) */}
