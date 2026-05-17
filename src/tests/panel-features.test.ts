@@ -1113,3 +1113,146 @@ describe('CanvasComparePanel snapshot logic', () => {
     expect(after.takenAt).toBeGreaterThan(before.takenAt);
   });
 });
+
+// ── GridDuplicatorPanel — pattern math ────────────────────────────────────────
+
+interface DupShape {
+  x: number; y: number; width: number; height: number; type: string;
+}
+
+function toRad2(deg: number) { return (deg * Math.PI) / 180; }
+
+function computeGrid(shape: DupShape, rows: number, cols: number, gapX: number, gapY: number) {
+  const positions: { x: number; y: number }[] = [];
+  const w = shape.width + gapX;
+  const h = shape.height + gapY;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 && c === 0) continue;
+      positions.push({ x: shape.x + c * w, y: shape.y + r * h });
+    }
+  }
+  return positions;
+}
+
+function computeRing(shape: DupShape, count: number, radius: number) {
+  const cx = shape.x + shape.width / 2;
+  const cy = shape.y + shape.height / 2;
+  const positions: { x: number; y: number; rotation: number }[] = [];
+  for (let i = 1; i < count; i++) {
+    const angle = (2 * Math.PI * i) / count;
+    positions.push({
+      x: cx + Math.cos(angle) * radius - shape.width / 2,
+      y: cy + Math.sin(angle) * radius - shape.height / 2,
+      rotation: (angle * 180) / Math.PI,
+    });
+  }
+  return positions;
+}
+
+function computeSpiral(shape: DupShape, count: number, startRadius: number, spacing: number, turns: number) {
+  const cx = shape.x + shape.width / 2;
+  const cy = shape.y + shape.height / 2;
+  const positions: { x: number; y: number }[] = [];
+  for (let i = 1; i < count; i++) {
+    const t = i / Math.max(count - 1, 1);
+    const angle = t * turns * 2 * Math.PI;
+    const r = startRadius + spacing * i;
+    positions.push({
+      x: cx + Math.cos(angle) * r - shape.width / 2,
+      y: cy + Math.sin(angle) * r - shape.height / 2,
+    });
+  }
+  return positions;
+}
+
+describe('GridDuplicatorPanel pattern math', () => {
+  const shape: DupShape = { x: 0, y: 0, width: 100, height: 60, type: 'rectangle' };
+
+  it('grid 2x3 creates 5 copies (skips original)', () => {
+    const patches = computeGrid(shape, 2, 3, 20, 20);
+    expect(patches.length).toBe(5); // 2*3 - 1
+  });
+
+  it('grid 1x1 creates 0 copies', () => {
+    const patches = computeGrid(shape, 1, 1, 20, 20);
+    expect(patches.length).toBe(0);
+  });
+
+  it('grid first copy is at gap offset', () => {
+    const patches = computeGrid(shape, 1, 2, 20, 0);
+    expect(patches[0].x).toBe(shape.width + 20);
+    expect(patches[0].y).toBe(0);
+  });
+
+  it('grid row stride uses height + gapY', () => {
+    const patches = computeGrid(shape, 2, 1, 0, 15);
+    expect(patches[0].y).toBe(shape.height + 15);
+  });
+
+  it('ring N copies creates N-1 shapes (skips original)', () => {
+    const patches = computeRing(shape, 8, 100);
+    expect(patches.length).toBe(7);
+  });
+
+  it('ring copies are on a circle of given radius', () => {
+    const r = 150;
+    const cx = shape.x + shape.width / 2;
+    const cy = shape.y + shape.height / 2;
+    const patches = computeRing(shape, 4, r);
+    for (const p of patches) {
+      const dist = Math.sqrt((p.x + shape.width / 2 - cx) ** 2 + (p.y + shape.height / 2 - cy) ** 2);
+      expect(Math.abs(dist - r)).toBeLessThan(0.01);
+    }
+  });
+
+  it('ring angles are evenly distributed', () => {
+    const count = 6; // Use 6 so all angles stay in [0, π], avoiding atan2 wrap
+    const radius = 100;
+    const patches = computeRing(shape, count, radius);
+    const cx = shape.x + shape.width / 2;
+    const cy = shape.y + shape.height / 2;
+    // Compute raw angles without atan2: use acos of normalized x, with sign from y
+    const angles = patches.map(p => {
+      const dx = p.x + shape.width / 2 - cx;
+      const dy = p.y + shape.height / 2 - cy;
+      const a = Math.atan2(dy, dx);
+      return a < 0 ? a + 2 * Math.PI : a; // normalize to [0, 2π]
+    }).sort((a, b) => a - b);
+    const expectedGap = (2 * Math.PI) / count;
+    // Each consecutive gap should be close to 2π/count
+    for (let i = 1; i < angles.length; i++) {
+      expect(Math.abs((angles[i] - angles[i - 1]) - expectedGap)).toBeLessThan(0.01);
+    }
+  });
+
+  it('spiral creates count-1 copies', () => {
+    const patches = computeSpiral(shape, 10, 30, 15, 2);
+    expect(patches.length).toBe(9);
+  });
+
+  it('spiral copies have increasing distance from center', () => {
+    const cx = shape.x + shape.width / 2;
+    const cy = shape.y + shape.height / 2;
+    const patches = computeSpiral(shape, 6, 30, 20, 1);
+    const dists = patches.map(p => Math.sqrt((p.x + shape.width / 2 - cx) ** 2 + (p.y + shape.height / 2 - cy) ** 2));
+    for (let i = 1; i < dists.length; i++) {
+      expect(dists[i]).toBeGreaterThan(dists[i - 1]);
+    }
+  });
+
+  it('progressive scale-down applies correctly', () => {
+    const patches = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 200, y: 0 }];
+    const result = patches.map((p, i) => ({ ...p, scaleX: Math.max(0.2, 1 - 0.05 * (i + 1)) }));
+    expect(result[0].scaleX).toBeCloseTo(0.95);
+    expect(result[1].scaleX).toBeCloseTo(0.90);
+    expect(result[2].scaleX).toBeCloseTo(0.85);
+  });
+
+  it('progressive fade-out clamps to minimum 0.1', () => {
+    const opacity = (i: number) => Math.max(0.1, 1 - 0.1 * (i + 1));
+    for (let i = 0; i < 20; i++) {
+      expect(opacity(i)).toBeGreaterThanOrEqual(0.1);
+    }
+  });
+});
