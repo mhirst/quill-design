@@ -121,6 +121,7 @@ import { FontPairingPanel } from './components/canvas/FontPairingPanel';
 import { EasingCurvePanel } from './components/canvas/EasingCurvePanel';
 import { IconExportPanel } from './components/canvas/IconExportPanel';
 import { ContrastMatrixPanel } from './components/canvas/ContrastMatrixPanel';
+import { LayerStackPanel } from './components/canvas/LayerStackPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -511,6 +512,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showEasingCurve, setShowEasingCurve] = useState(false);
   const [showIconExport, setShowIconExport] = useState(false);
   const [showContrastMatrix, setShowContrastMatrix] = useState(false);
+  const [showLayerStack, setShowLayerStack] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1043,10 +1045,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowColorContrast(v => !v); return; }
             break;
           }
-          // ── 3 — 3D Transform ──────────────────────────────────────────────
+          // ── 3 — 3D Transform / Layer Stack 3D ────────────────────────────
           case '3': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShow3DTransform(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowLayoutInspector(v => !v); return; }
+            if (e.altKey) { e.preventDefault(); setShowLayerStack(v => !v); return; }
             break;
           }
           // ── ] [ — Z-order ─────────────────────────────────────────────────
@@ -2752,6 +2755,37 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showContrastMatrix}
         onClose={() => setShowContrastMatrix(false)}
         shapes={drawing.state.shapes}
+      />
+
+      {/* Layer Stack 3D Panel (⌘⌥3) */}
+      <LayerStackPanel
+        open={showLayerStack}
+        onClose={() => setShowLayerStack(false)}
+        shapes={drawing.state.shapes}
+        selectedShapeId={drawing.state.selectedId}
+        onSelectShape={(id) => { drawingRef.current.select(id); setActiveTool('cursor'); }}
+        onMoveLayer={(id, direction) => {
+          drawingRef.current.select(id);
+          if (direction === 'top') drawingRef.current.bringToFront();
+          else if (direction === 'bottom') drawingRef.current.sendToBack();
+          else if (direction === 'up') {
+            const layerShapes = drawing.state.shapes;
+            const layerIdx = layerShapes.findIndex(s => s.id === id);
+            if (layerIdx < layerShapes.length - 1) {
+              const newOrder = [...layerShapes];
+              [newOrder[layerIdx], newOrder[layerIdx + 1]] = [newOrder[layerIdx + 1], newOrder[layerIdx]];
+              drawingRef.current.reorderShapes(newOrder);
+            }
+          } else {
+            const layerShapes = drawing.state.shapes;
+            const layerIdx = layerShapes.findIndex(s => s.id === id);
+            if (layerIdx > 0) {
+              const newOrder = [...layerShapes];
+              [newOrder[layerIdx], newOrder[layerIdx - 1]] = [newOrder[layerIdx - 1], newOrder[layerIdx]];
+              drawingRef.current.reorderShapes(newOrder);
+            }
+          }
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
