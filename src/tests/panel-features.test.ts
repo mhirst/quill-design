@@ -4433,3 +4433,198 @@ describe('SpacingTokenInspector utilities', () => {
     expect(s.avgGap).toBe(15);
   });
 });
+
+// ── ColorPaletteExtractor ─────────────────────────────────────────────────────
+
+function cpeHexToRGB(hex: string): { r: number; g: number; b: number } | null {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return null;
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+  return { r, g, b };
+}
+
+function cpeRgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
+}
+
+interface CPEHSL { h: number; s: number; l: number }
+function cpeRgbToHSL(r: number, g: number, b: number): CPEHSL {
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+  else if (max === gn) h = ((bn - rn) / d + 2) / 6;
+  else h = ((rn - gn) / d + 4) / 6;
+  return { h: h * 360, s, l };
+}
+
+function cpeHslToRGB(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  if (s === 0) { const v = Math.round(l * 255); return { r: v, g: v, b: v }; }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hn = h / 360;
+  return {
+    r: Math.round(hue2rgb(p, q, hn + 1/3) * 255),
+    g: Math.round(hue2rgb(p, q, hn) * 255),
+    b: Math.round(hue2rgb(p, q, hn - 1/3) * 255),
+  };
+}
+
+function cpeLuminance(r: number, g: number, b: number): number {
+  const lin = (v: number) => { const n = v / 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function cpeContrastRatio(hex1: string, hex2: string): number {
+  const rgb1 = cpeHexToRGB(hex1)!;
+  const rgb2 = cpeHexToRGB(hex2)!;
+  const l1 = cpeLuminance(rgb1.r, rgb1.g, rgb1.b);
+  const l2 = cpeLuminance(rgb2.r, rgb2.g, rgb2.b);
+  const lighter = Math.max(l1, l2), darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function cpeTextColor(hex: string): string {
+  const rgb = cpeHexToRGB(hex)!;
+  return cpeLuminance(rgb.r, rgb.g, rgb.b) > 0.179 ? '#000000' : '#ffffff';
+}
+
+function cpeGenerateHarmony(baseHex: string, type: string): string[] {
+  const rgb = cpeHexToRGB(baseHex)!;
+  const hsl = cpeRgbToHSL(rgb.r, rgb.g, rgb.b);
+  const shift = (deg: number) => {
+    const { r, g, b } = cpeHslToRGB((hsl.h + deg + 360) % 360, hsl.s, hsl.l);
+    return cpeRgbToHex(r, g, b);
+  };
+  switch (type) {
+    case 'complementary': return [baseHex, shift(180)];
+    case 'triadic': return [baseHex, shift(120), shift(240)];
+    case 'analogous': return [shift(-30), baseHex, shift(30)];
+    case 'split-complementary': return [baseHex, shift(150), shift(210)];
+    case 'tetradic': return [baseHex, shift(90), shift(180), shift(270)];
+    case 'monochromatic': {
+      const li = (amt: number) => { const { r, g, b } = cpeHslToRGB(hsl.h, hsl.s, Math.min(1, hsl.l + amt)); return cpeRgbToHex(r, g, b); };
+      const da = (amt: number) => { const { r, g, b } = cpeHslToRGB(hsl.h, hsl.s, Math.max(0, hsl.l - amt)); return cpeRgbToHex(r, g, b); };
+      return [da(0.3), da(0.15), baseHex, li(0.15), li(0.3)];
+    }
+    default: return [baseHex];
+  }
+}
+
+function cpeExportCSS(entries: Array<{ name: string; hex: string }>): string {
+  const vars = entries.map(e => {
+    const name = e.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    return `  --color-${name}: ${e.hex};`;
+  }).join('\n');
+  return `:root {\n${vars}\n}`;
+}
+
+describe('ColorPaletteExtractor', () => {
+  it('hexToRGB: parses 6-digit hex', () => {
+    const rgb = cpeHexToRGB('#ff6600');
+    expect(rgb).toEqual({ r: 255, g: 102, b: 0 });
+  });
+
+  it('hexToRGB: returns null for invalid', () => {
+    expect(cpeHexToRGB('bad')).toBeNull();
+    expect(cpeHexToRGB('#xyz123')).toBeNull();
+  });
+
+  it('rgbToHex: encodes back correctly', () => {
+    expect(cpeRgbToHex(255, 0, 128)).toBe('#ff0080');
+    expect(cpeRgbToHex(0, 0, 0)).toBe('#000000');
+    expect(cpeRgbToHex(255, 255, 255)).toBe('#ffffff');
+  });
+
+  it('rgbToHex: clamps out-of-range values', () => {
+    expect(cpeRgbToHex(-10, 0, 300)).toBe('#0000ff');
+  });
+
+  it('rgbToHSL: pure red has hue ~0', () => {
+    const { h } = cpeRgbToHSL(255, 0, 0);
+    expect(h).toBeCloseTo(0, 0);
+  });
+
+  it('rgbToHSL: pure green has hue 120', () => {
+    const { h } = cpeRgbToHSL(0, 255, 0);
+    expect(h).toBeCloseTo(120, 0);
+  });
+
+  it('rgbToHSL: gray has zero saturation', () => {
+    const { s } = cpeRgbToHSL(128, 128, 128);
+    expect(s).toBe(0);
+  });
+
+  it('hslToRGB: round-trips through HSL', () => {
+    const { r, g, b } = cpeHslToRGB(240, 1, 0.5); // pure blue
+    expect(r).toBe(0);
+    expect(b).toBe(255);
+  });
+
+  it('contrastRatio: white on black is ~21', () => {
+    const cr = cpeContrastRatio('#ffffff', '#000000');
+    expect(cr).toBeCloseTo(21, 0);
+  });
+
+  it('contrastRatio: same color returns 1', () => {
+    expect(cpeContrastRatio('#aabbcc', '#aabbcc')).toBeCloseTo(1, 1);
+  });
+
+  it('textColor: returns black for light backgrounds', () => {
+    expect(cpeTextColor('#ffffff')).toBe('#000000');
+    expect(cpeTextColor('#eeeeee')).toBe('#000000');
+  });
+
+  it('textColor: returns white for dark backgrounds', () => {
+    expect(cpeTextColor('#000000')).toBe('#ffffff');
+    expect(cpeTextColor('#1a1a2e')).toBe('#ffffff');
+  });
+
+  it('generateHarmony: complementary has 2 colors', () => {
+    const h = cpeGenerateHarmony('#ff0000', 'complementary');
+    expect(h).toHaveLength(2);
+    expect(h[0]).toBe('#ff0000');
+  });
+
+  it('generateHarmony: triadic has 3 colors', () => {
+    expect(cpeGenerateHarmony('#ff0000', 'triadic')).toHaveLength(3);
+  });
+
+  it('generateHarmony: tetradic has 4 colors', () => {
+    expect(cpeGenerateHarmony('#ff0000', 'tetradic')).toHaveLength(4);
+  });
+
+  it('generateHarmony: monochromatic has 5 colors', () => {
+    expect(cpeGenerateHarmony('#6366f1', 'monochromatic')).toHaveLength(5);
+  });
+
+  it('generateHarmony: analogous has 3 colors', () => {
+    expect(cpeGenerateHarmony('#00ff00', 'analogous')).toHaveLength(3);
+  });
+
+  it('exportCSS: generates valid CSS variables', () => {
+    const css = cpeExportCSS([{ name: 'Primary', hex: '#6366f1' }, { name: 'Secondary', hex: '#a78bfa' }]);
+    expect(css).toContain(':root {');
+    expect(css).toContain('--color-primary: #6366f1');
+    expect(css).toContain('--color-secondary: #a78bfa');
+  });
+
+  it('exportCSS: sanitizes names with spaces', () => {
+    const css = cpeExportCSS([{ name: 'Dark Blue', hex: '#1e3a8a' }]);
+    expect(css).toContain('--color-dark-blue:');
+  });
+});
