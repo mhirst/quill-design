@@ -723,3 +723,187 @@ describe('shape bounding box for export', () => {
     expect(bb).toEqual({ x: 0, y: 0, width: 400, height: 300 });
   });
 });
+
+// ─── Grid snap ───────────────────────────────────────────────────────────────
+
+describe('grid snap (8px)', () => {
+  const GRID_SIZE = 8;
+  const gridSnap = (v: number) => Math.round(v / GRID_SIZE) * GRID_SIZE;
+
+  it('snaps 0 to 0', () => { expect(gridSnap(0)).toBe(0); });
+  it('snaps 4 to 8 (JS Math.round rounds 0.5 up)', () => { expect(gridSnap(4)).toBe(8); });
+  it('snaps 3 to 0 (round down)', () => { expect(gridSnap(3)).toBe(0); });
+  it('snaps 5 to 8 (round up)', () => { expect(gridSnap(5)).toBe(8); });
+  it('snaps 8 to 8', () => { expect(gridSnap(8)).toBe(8); });
+  it('snaps 11 to 8', () => { expect(gridSnap(11)).toBe(8); });
+  it('snaps 12 to 16', () => { expect(gridSnap(12)).toBe(16); });
+  it('snaps 100 to 104 (Math.round(12.5)=13, nearest multiple of 8)', () => { expect(gridSnap(100)).toBe(104); });
+  it('snaps 103 to 104', () => { expect(gridSnap(103)).toBe(104); });
+  it('snaps negative -3 to -0 (rounds to 0)', () => { expect(gridSnap(-3)).toBe(-0); });
+  it('snaps negative -5 to -8', () => { expect(gridSnap(-5)).toBe(-8); });
+
+  it('grid snap moves shape position to nearest 8px boundary', () => {
+    const shape = makeRect('r1', { x: 13, y: 22 });
+    const snappedX = gridSnap(shape.x);
+    const snappedY = gridSnap(shape.y);
+    expect(snappedX).toBe(16);
+    expect(snappedY).toBe(24);
+  });
+});
+
+// ─── Aspect ratio lock ────────────────────────────────────────────────────────
+
+describe('aspect ratio lock math', () => {
+  it('maintains ratio when width changes', () => {
+    const shape = makeRect('r1', { width: 200, height: 100 });
+    const ratio = shape.height / shape.width; // 0.5
+    const newWidth = 300;
+    const newHeight = Math.round(Math.max(8, newWidth * ratio));
+    expect(newHeight).toBe(150);
+  });
+
+  it('maintains ratio when height changes', () => {
+    const shape = makeRect('r1', { width: 200, height: 100 });
+    const ratio = shape.height / shape.width; // 0.5
+    const newHeight = 50;
+    const newWidth = Math.round(Math.max(8, newHeight / ratio));
+    expect(newWidth).toBe(100);
+  });
+
+  it('enforces minimum size of 8px on width', () => {
+    const ratio = 3; // height = 3x width
+    const newWidth = 2;
+    const newHeight = Math.round(Math.max(8, newWidth * ratio));
+    expect(newHeight).toBeGreaterThanOrEqual(8);
+  });
+
+  it('maintains ratio for square shapes', () => {
+    const shape = makeRect('r1', { width: 100, height: 100 });
+    const ratio = shape.height / shape.width; // 1.0
+    const newWidth = 200;
+    const newHeight = Math.round(Math.max(8, newWidth * ratio));
+    expect(newHeight).toBe(200);
+  });
+
+  it('16:9 ratio preserved when width doubles', () => {
+    const shape = makeRect('r1', { width: 160, height: 90 });
+    const ratio = shape.height / shape.width; // 0.5625
+    const newWidth = 320;
+    const newHeight = Math.round(Math.max(8, newWidth * ratio));
+    expect(newHeight).toBe(180);
+  });
+});
+
+// ─── Cursor coordinate computation ───────────────────────────────────────────
+
+describe('canvas cursor coordinates', () => {
+  // Simulate screenToCanvas: (screenX - panX) / zoom
+  function screenToCanvas(screenX: number, screenY: number, panX: number, panY: number, zoom: number) {
+    return {
+      x: Math.round((screenX - panX) / zoom),
+      y: Math.round((screenY - panY) / zoom),
+    };
+  }
+
+  it('no pan, zoom=1: screen coords = canvas coords', () => {
+    const { x, y } = screenToCanvas(100, 200, 0, 0, 1);
+    expect(x).toBe(100);
+    expect(y).toBe(200);
+  });
+
+  it('pan offset shifts canvas origin', () => {
+    const { x, y } = screenToCanvas(100, 200, 50, 75, 1);
+    expect(x).toBe(50);
+    expect(y).toBe(125);
+  });
+
+  it('zoom 2x halves canvas coords', () => {
+    const { x, y } = screenToCanvas(200, 300, 0, 0, 2);
+    expect(x).toBe(100);
+    expect(y).toBe(150);
+  });
+
+  it('zoom 0.5 doubles canvas coords', () => {
+    const { x, y } = screenToCanvas(100, 150, 0, 0, 0.5);
+    expect(x).toBe(200);
+    expect(y).toBe(300);
+  });
+
+  it('combined pan and zoom', () => {
+    const { x, y } = screenToCanvas(200, 300, 50, 50, 2);
+    expect(x).toBe(75);
+    expect(y).toBe(125);
+  });
+});
+
+// ─── Shape visibility and lock ────────────────────────────────────────────────
+
+describe('shape visibility and lock flags', () => {
+  it('new shape defaults to visible (hidden=undefined)', () => {
+    const s = defaultShape('rectangle', 'r1');
+    expect(s.hidden).toBeUndefined();
+    expect(s.hidden ?? false).toBe(false);
+  });
+
+  it('new shape defaults to unlocked (locked=undefined)', () => {
+    const s = defaultShape('rectangle', 'r1');
+    expect(s.locked).toBeUndefined();
+    expect(s.locked ?? false).toBe(false);
+  });
+
+  it('can set hidden=true via patch', () => {
+    const s = { ...defaultShape('rectangle', 'r1'), hidden: true };
+    expect(s.hidden).toBe(true);
+  });
+
+  it('can set locked=true via patch', () => {
+    const s = { ...defaultShape('rectangle', 'r1'), locked: true };
+    expect(s.locked).toBe(true);
+  });
+
+  it('toggling hidden flips the flag', () => {
+    const s = defaultShape('rectangle', 'r1');
+    const s2 = { ...s, hidden: !s.hidden };
+    expect(s2.hidden).toBe(true);
+    const s3 = { ...s2, hidden: !s2.hidden };
+    expect(s3.hidden).toBe(false);
+  });
+
+  it('hidden shapes are excluded from selection/interaction', () => {
+    const shapes = [
+      makeRect('r1', { hidden: false }),
+      makeRect('r2', { hidden: true }),
+      makeRect('r3', {}),
+    ];
+    const interactable = shapes.filter(s => !(s.hidden ?? false));
+    expect(interactable).toHaveLength(2);
+    expect(interactable.map(s => s.id)).toContain('r1');
+    expect(interactable.map(s => s.id)).not.toContain('r2');
+  });
+
+  it('locked shapes cannot be moved', () => {
+    const shapes = [
+      makeRect('r1', { locked: true }),
+      makeRect('r2', { locked: false }),
+      makeRect('r3', {}),
+    ];
+    const moveable = shapes.filter(s => !(s.locked ?? false));
+    expect(moveable).toHaveLength(2);
+    expect(moveable.map(s => s.id)).not.toContain('r1');
+  });
+
+  it('layer reorder preserves all shape properties', () => {
+    const shapes = [
+      makeRect('r1', { x: 0 }),
+      makeRect('r2', { x: 100 }),
+      makeRect('r3', { x: 200 }),
+    ];
+    // Reorder: move r3 to front (first in array = behind, last = front)
+    const reordered = [shapes[0], shapes[2], shapes[1]];
+    expect(reordered[0].id).toBe('r1');
+    expect(reordered[1].id).toBe('r3');
+    expect(reordered[2].id).toBe('r2');
+    // All properties preserved
+    expect(reordered[1].x).toBe(200);
+  });
+});

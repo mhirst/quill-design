@@ -14,9 +14,14 @@ interface Props {
   shapes: Shape[];        // all shapes on canvas
   selectedIds: string[];  // currently selected ids
   onAlign: (patches: { id: string; x: number; y: number }[]) => void;
+  onStackH?: (gap?: number) => void;
+  onStackV?: (gap?: number) => void;
+  onDistributeH?: () => void;
+  onDistributeV?: () => void;
+  onAutoLayout?: () => void;
 }
 
-export function AlignmentBar({ shapes, selectedIds, onAlign }: Props) {
+export function AlignmentBar({ shapes, selectedIds, onAlign, onStackH, onStackV, onDistributeH, onDistributeV, onAutoLayout }: Props) {
   if (selectedIds.length < 2) return null;
 
   const selected = shapes.filter(s => selectedIds.includes(s.id));
@@ -45,6 +50,16 @@ export function AlignmentBar({ shapes, selectedIds, onAlign }: Props) {
       backdropFilter: 'blur(8px)',
       userSelect: 'none',
     }}>
+      {/* Selection count badge */}
+      <div style={{
+        fontSize: 10, fontWeight: 600, color: 'var(--accent)',
+        background: 'rgba(99,102,241,0.1)',
+        border: '1px solid rgba(99,102,241,0.2)',
+        borderRadius: 4, padding: '1px 6px', marginRight: 4, whiteSpace: 'nowrap',
+      }}>
+        {selectedIds.length}
+      </div>
+      <Sep />
       {/* Align group */}
       <AlignBtn title="Align left edges" onClick={() => handleAlign('align-left')} icon={<AlignLeftIcon />} />
       <AlignBtn title="Align horizontal centers" onClick={() => handleAlign('align-center-h')} icon={<AlignCenterHIcon />} />
@@ -56,17 +71,43 @@ export function AlignmentBar({ shapes, selectedIds, onAlign }: Props) {
       <Sep />
       {/* Distribute — only useful with 3+ shapes */}
       <AlignBtn
-        title="Distribute horizontally"
-        onClick={() => handleAlign('distribute-h')}
+        title="Distribute horizontally (equal gaps)"
+        onClick={() => onDistributeH ? onDistributeH() : handleAlign('distribute-h')}
         disabled={selectedIds.length < 3}
         icon={<DistributeHIcon />}
       />
       <AlignBtn
-        title="Distribute vertically"
-        onClick={() => handleAlign('distribute-v')}
+        title="Distribute vertically (equal gaps)"
+        onClick={() => onDistributeV ? onDistributeV() : handleAlign('distribute-v')}
         disabled={selectedIds.length < 3}
         icon={<DistributeVIcon />}
       />
+      {/* Stack — only show if callbacks provided */}
+      {(onStackH || onStackV) && <Sep />}
+      {onStackH && (
+        <AlignBtn
+          title="Stack horizontally with 16px gap"
+          onClick={() => onStackH(16)}
+          icon={<StackHIcon />}
+        />
+      )}
+      {onStackV && (
+        <AlignBtn
+          title="Stack vertically with 16px gap"
+          onClick={() => onStackV(16)}
+          icon={<StackVIcon />}
+        />
+      )}
+      {onAutoLayout && (
+        <>
+          <Sep />
+          <AlignBtn
+            title="Auto-detect layout direction and wrap in frame (⌘K → auto layout)"
+            onClick={onAutoLayout}
+            icon={<AutoLayoutIcon />}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -198,4 +239,39 @@ function DistributeHIcon() {
 }
 function DistributeVIcon() {
   return <svg {...S}><line x1="3" y1="2" x2="13" y2="2"/><line x1="3" y1="14" x2="13" y2="14"/><rect x="5" y="5" width="6" height="6" rx="0.5"/></svg>;
+}
+/** Stack H: three rectangles arranged in a row with arrows indicating direction */
+function StackHIcon() {
+  return (
+    <svg {...S}>
+      <rect x="1" y="5" width="4" height="6" rx="0.5"/>
+      <rect x="6" y="5" width="4" height="6" rx="0.5"/>
+      <rect x="11" y="5" width="4" height="6" rx="0.5"/>
+      <line x1="5.5" y1="8" x2="5.7" y2="8" strokeOpacity={0.5}/>
+      <line x1="10.5" y1="8" x2="10.7" y2="8" strokeOpacity={0.5}/>
+    </svg>
+  );
+}
+/** Stack V: three rectangles arranged in a column */
+function StackVIcon() {
+  return (
+    <svg {...S}>
+      <rect x="5" y="1" width="6" height="4" rx="0.5"/>
+      <rect x="5" y="6" width="6" height="4" rx="0.5"/>
+      <rect x="5" y="11" width="6" height="4" rx="0.5"/>
+    </svg>
+  );
+}
+
+function AutoLayoutIcon() {
+  return (
+    <svg {...S}>
+      {/* Frame outline */}
+      <rect x="1" y="1" width="14" height="14" rx="2" fill="none"/>
+      {/* Row of 3 items inside */}
+      <rect x="2.5" y="5" width="3" height="6" rx="0.5"/>
+      <rect x="6.5" y="5" width="3" height="6" rx="0.5"/>
+      <rect x="10.5" y="5" width="3" height="6" rx="0.5"/>
+    </svg>
+  );
 }

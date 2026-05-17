@@ -14,6 +14,8 @@ import {
   SaveAll,
   Sun,
   Moon,
+  PanelLeftOpen,
+  PanelLeftClose,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -50,6 +52,8 @@ interface Props {
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
+  leftPanelCollapsed?: boolean;
+  onToggleLeftPanel?: () => void;
 }
 
 export function ToolSidebar({
@@ -60,6 +64,8 @@ export function ToolSidebar({
   onOpen,
   onSave,
   onSaveAs,
+  leftPanelCollapsed,
+  onToggleLeftPanel,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -96,6 +102,23 @@ export function ToolSidebar({
         height: '100%',
       }}
     >
+      {/* ── Panel toggle ── */}
+      {onToggleLeftPanel && (
+        <>
+          <div style={{ width: '100%', padding: '0 4px', marginBottom: 2 }}>
+            <ToolBtn
+              icon={leftPanelCollapsed
+                ? <PanelLeftOpen size={16} />
+                : <PanelLeftClose size={16} />}
+              title={leftPanelCollapsed ? 'Show layers panel (⌘\\)' : 'Hide layers panel (⌘\\)'}
+              active={!leftPanelCollapsed}
+              onClick={onToggleLeftPanel}
+            />
+          </div>
+          <Divider />
+        </>
+      )}
+
       {/* ── Drawing tools ── */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%', padding: '0 4px' }}>
         <ToolBtn icon={<MousePointer2 size={17} />} title="Cursor (V)" active={activeTool === 'cursor'} onClick={() => onToolChange('cursor')} />
