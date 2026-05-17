@@ -1895,3 +1895,200 @@ describe('ContrastMatrixPanel utilities', () => {
     expect(luminanceTest('#000000')).toBeCloseTo(0.0, 3);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GeometryPanel — inlined math utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PHI_TEST = (1 + Math.sqrt(5)) / 2; // 1.6180339...
+
+function goldenRatioTest(value: number, mode: 'longer' | 'shorter'): number {
+  if (mode === 'longer') return value * PHI_TEST;
+  return value / PHI_TEST;
+}
+
+function ruleOfThirdsTest(width: number, height: number): { x: number[]; y: number[] } {
+  return {
+    x: [width / 3, (2 * width) / 3],
+    y: [height / 3, (2 * height) / 3],
+  };
+}
+
+function polygonVerticesTest(sides: number, radius: number, rotationDeg = 0): Array<{ x: number; y: number }> {
+  const rotRad = (rotationDeg * Math.PI) / 180;
+  return Array.from({ length: sides }, (_, i) => {
+    const angle = (2 * Math.PI * i) / sides - Math.PI / 2 + rotRad;
+    return { x: radius * Math.cos(angle), y: radius * Math.sin(angle) };
+  });
+}
+
+function inscribedCircleTest(width: number, height: number): number {
+  return Math.min(width, height) / 2;
+}
+
+function circumscribedCircleTest(width: number, height: number): number {
+  return Math.sqrt(width * width + height * height) / 2;
+}
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+function aspectRatioString(width: number, height: number): string {
+  const g = gcd(Math.round(width), Math.round(height));
+  return `${Math.round(width) / g}:${Math.round(height) / g}`;
+}
+
+function spacingScaleTest(base: number, type: 'linear' | 'fibonacci' | '8pt' | 'golden', steps: number): number[] {
+  if (type === 'linear') {
+    return Array.from({ length: steps }, (_, i) => base + i * base);
+  }
+  if (type === 'fibonacci') {
+    const fibs: number[] = [base, base];
+    while (fibs.length < steps) {
+      fibs.push(fibs[fibs.length - 1] + fibs[fibs.length - 2]);
+    }
+    return fibs.slice(0, steps);
+  }
+  if (type === '8pt') {
+    return Array.from({ length: steps }, (_, i) => (i + 1) * 8);
+  }
+  // golden
+  return Array.from({ length: steps }, (_, i) => parseFloat((base * Math.pow(PHI_TEST, i)).toFixed(2)));
+}
+
+function pxToMmTest(px: number, ppi: number): number {
+  return (px / ppi) * 25.4;
+}
+
+function pxToPtTest(px: number): number {
+  return (px * 72) / 96;
+}
+
+describe('GeometryPanel math utilities', () => {
+  // PHI constant
+  it('PHI equals golden ratio', () => {
+    expect(PHI_TEST).toBeCloseTo(1.6180339887, 5);
+  });
+
+  // goldenRatio
+  it('goldenRatio longer: 100 → ~161.8', () => {
+    expect(goldenRatioTest(100, 'longer')).toBeCloseTo(161.803, 2);
+  });
+
+  it('goldenRatio shorter: 100 → ~61.8', () => {
+    expect(goldenRatioTest(100, 'shorter')).toBeCloseTo(61.803, 2);
+  });
+
+  it('goldenRatio: longer × shorter = original²', () => {
+    const a = goldenRatioTest(200, 'longer');
+    const b = goldenRatioTest(200, 'shorter');
+    expect(a * b).toBeCloseTo(200 * 200, 0);
+  });
+
+  // ruleOfThirds
+  it('ruleOfThirds: 1200×900 → x=[400,800], y=[300,600]', () => {
+    const r = ruleOfThirdsTest(1200, 900);
+    expect(r.x).toEqual([400, 800]);
+    expect(r.y).toEqual([300, 600]);
+  });
+
+  it('ruleOfThirds: x lines divide width into 3 equal parts', () => {
+    const { x } = ruleOfThirdsTest(300, 200);
+    expect(x[0]).toBeCloseTo(100, 5);
+    expect(x[1]).toBeCloseTo(200, 5);
+  });
+
+  // polygonVertices
+  it('polygon: square (4 sides, r=1) has 4 vertices', () => {
+    const verts = polygonVerticesTest(4, 1);
+    expect(verts).toHaveLength(4);
+  });
+
+  it('polygon: equilateral triangle centroid ~0', () => {
+    const verts = polygonVerticesTest(3, 100);
+    const cx = verts.reduce((s, v) => s + v.x, 0) / 3;
+    const cy = verts.reduce((s, v) => s + v.y, 0) / 3;
+    expect(cx).toBeCloseTo(0, 1);
+    expect(cy).toBeCloseTo(0, 1);
+  });
+
+  it('polygon: hexagon (6 sides) all vertices equidistant from center', () => {
+    const verts = polygonVerticesTest(6, 50);
+    verts.forEach(v => {
+      const dist = Math.sqrt(v.x * v.x + v.y * v.y);
+      expect(dist).toBeCloseTo(50, 4);
+    });
+  });
+
+  it('polygon: rotation shifts vertices but not distances', () => {
+    const v0 = polygonVerticesTest(5, 80, 0);
+    const v1 = polygonVerticesTest(5, 80, 45);
+    // Same distances
+    v1.forEach(v => {
+      const dist = Math.sqrt(v.x * v.x + v.y * v.y);
+      expect(dist).toBeCloseTo(80, 4);
+    });
+    // Different positions
+    expect(v0[0].x).not.toBeCloseTo(v1[0].x, 1);
+  });
+
+  // inscribed / circumscribed circles
+  it('inscribedCircle: 100×60 → 30', () => {
+    expect(inscribedCircleTest(100, 60)).toBeCloseTo(30, 5);
+  });
+
+  it('circumscribedCircle: 3×4 rectangle → hyp/2 = 2.5', () => {
+    expect(circumscribedCircleTest(3, 4)).toBeCloseTo(2.5, 5);
+  });
+
+  it('inscribed ≤ circumscribed for any rectangle', () => {
+    expect(inscribedCircleTest(200, 80)).toBeLessThanOrEqual(circumscribedCircleTest(200, 80));
+  });
+
+  // aspectRatioString
+  it('aspectRatioString: 1920×1080 → "16:9"', () => {
+    expect(aspectRatioString(1920, 1080)).toBe('16:9');
+  });
+
+  it('aspectRatioString: 800×600 → "4:3"', () => {
+    expect(aspectRatioString(800, 600)).toBe('4:3');
+  });
+
+  // spacingScale
+  it('spacingScale 8pt: first 4 steps = 8,16,24,32', () => {
+    expect(spacingScaleTest(8, '8pt', 4)).toEqual([8, 16, 24, 32]);
+  });
+
+  it('spacingScale linear base=10: steps match multiples', () => {
+    const scale = spacingScaleTest(10, 'linear', 5);
+    expect(scale).toEqual([10, 20, 30, 40, 50]);
+  });
+
+  it('spacingScale fibonacci: each term = sum of previous two', () => {
+    const scale = spacingScaleTest(8, 'fibonacci', 6);
+    for (let i = 2; i < scale.length; i++) {
+      expect(scale[i]).toBe(scale[i - 1] + scale[i - 2]);
+    }
+  });
+
+  it('spacingScale golden: ratio between steps ≈ PHI', () => {
+    const scale = spacingScaleTest(10, 'golden', 5);
+    for (let i = 1; i < scale.length; i++) {
+      expect(scale[i] / scale[i - 1]).toBeCloseTo(PHI_TEST, 2);
+    }
+  });
+
+  // unit conversions
+  it('pxToMm: 96px @96ppi = 25.4mm (1 inch)', () => {
+    expect(pxToMmTest(96, 96)).toBeCloseTo(25.4, 4);
+  });
+
+  it('pxToPt: 96px = 72pt', () => {
+    expect(pxToPtTest(96)).toBeCloseTo(72, 5);
+  });
+
+  it('pxToPt: 12px ≈ 9pt', () => {
+    expect(pxToPtTest(12)).toBeCloseTo(9, 5);
+  });
+});

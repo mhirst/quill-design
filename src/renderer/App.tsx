@@ -123,6 +123,7 @@ import { IconExportPanel } from './components/canvas/IconExportPanel';
 import { ContrastMatrixPanel } from './components/canvas/ContrastMatrixPanel';
 import { LayerStackPanel } from './components/canvas/LayerStackPanel';
 import { HandoffSpecPanel } from './components/canvas/HandoffSpecPanel';
+import { GeometryPanel } from './components/canvas/GeometryPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -515,6 +516,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showContrastMatrix, setShowContrastMatrix] = useState(false);
   const [showLayerStack, setShowLayerStack] = useState(false);
   const [showHandoffSpec, setShowHandoffSpec] = useState(false);
+  const [showGeometry, setShowGeometry] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1057,6 +1059,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── 4 — Handoff Spec ──────────────────────────────────────────────
           case '4': {
             if (e.altKey) { e.preventDefault(); setShowHandoffSpec(v => !v); return; }
+            break;
+          }
+          // ── 5 — Geometry Calculator ───────────────────────────────────────
+          case '5': {
+            if (e.altKey) { e.preventDefault(); setShowGeometry(v => !v); return; }
             break;
           }
           // ── ] [ — Z-order ─────────────────────────────────────────────────
@@ -2801,6 +2808,20 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onClose={() => setShowHandoffSpec(false)}
         shapes={drawing.state.shapes}
         designName={(fileManager.filePath ?? activeFilePath ?? '').split(/[\\/]/).pop()?.replace(/\.pen$/, '') || 'Design'}
+      />
+
+      {/* Geometry Calculator (⌘⌥5) */}
+      <GeometryPanel
+        open={showGeometry}
+        onClose={() => setShowGeometry(false)}
+        selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+        onApplyToShape={(patch) => {
+          const id = drawing.state.selectedId;
+          if (id) {
+            drawingRef.current.updateShape(id, patch);
+            showToast('Geometry applied', 'action');
+          }
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
