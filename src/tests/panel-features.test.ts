@@ -1807,3 +1807,91 @@ describe('EasingCurvePanel utilities', () => {
     expect(maxY).toBeGreaterThan(1.0); // overshoots
   });
 });
+
+// ── ContrastMatrixPanel utilities ─────────────────────────────────────────────
+
+function hexToRgbTest(hex: string): [number, number, number] | null {
+  const h = hex.replace('#', '');
+  if (h.length === 3) return [parseInt(h[0]+h[0],16), parseInt(h[1]+h[1],16), parseInt(h[2]+h[2],16)];
+  if (h.length === 6) return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  return null;
+}
+function linearizeTest(c: number): number {
+  const s = c / 255;
+  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+function luminanceTest(hex: string): number {
+  const rgb = hexToRgbTest(hex);
+  if (!rgb) return 0;
+  const [r, g, b] = rgb;
+  return 0.2126 * linearizeTest(r) + 0.7152 * linearizeTest(g) + 0.0722 * linearizeTest(b);
+}
+function contrastTest(hex1: string, hex2: string): number {
+  const l1 = luminanceTest(hex1); const l2 = luminanceTest(hex2);
+  const light = Math.max(l1, l2); const dark = Math.min(l1, l2);
+  return (light + 0.05) / (dark + 0.05);
+}
+type TestGrade = 'AAA' | 'AA' | 'AA-Large' | 'Fail';
+function gradeTest(ratio: number): TestGrade {
+  if (ratio >= 7) return 'AAA';
+  if (ratio >= 4.5) return 'AA';
+  if (ratio >= 3) return 'AA-Large';
+  return 'Fail';
+}
+
+describe('ContrastMatrixPanel utilities', () => {
+  it('black on white has contrast ratio ~21:1', () => {
+    const ratio = contrastTest('#000000', '#ffffff');
+    expect(Math.abs(ratio - 21)).toBeLessThan(0.1);
+  });
+
+  it('white on white has contrast ratio 1:1', () => {
+    const ratio = contrastTest('#ffffff', '#ffffff');
+    expect(ratio).toBeCloseTo(1.0, 1);
+  });
+
+  it('black on white grades as AAA', () => {
+    expect(gradeTest(contrastTest('#000000', '#ffffff'))).toBe('AAA');
+  });
+
+  it('mid-grey on white grades correctly', () => {
+    // #767676 on white ≈ 4.54:1 → AA
+    const ratio = contrastTest('#767676', '#ffffff');
+    const grade = gradeTest(ratio);
+    expect(grade).toBe('AA');
+    expect(ratio).toBeGreaterThan(4.5);
+  });
+
+  it('light grey on white fails WCAG', () => {
+    // #aaaaaa on white ≈ 2.32:1 → Fail
+    const ratio = contrastTest('#aaaaaa', '#ffffff');
+    expect(gradeTest(ratio)).toBe('Fail');
+    expect(ratio).toBeLessThan(3);
+  });
+
+  it('contrast ratio is symmetric', () => {
+    const r1 = contrastTest('#ff0000', '#0000ff');
+    const r2 = contrastTest('#0000ff', '#ff0000');
+    expect(Math.abs(r1 - r2)).toBeLessThan(0.001);
+  });
+
+  it('hexToRgbTest parses 6-digit hex', () => {
+    expect(hexToRgbTest('#ff8800')).toEqual([255, 136, 0]);
+  });
+
+  it('hexToRgbTest parses 3-digit hex', () => {
+    expect(hexToRgbTest('#f80')).toEqual([255, 136, 0]);
+  });
+
+  it('hexToRgbTest returns null for invalid', () => {
+    expect(hexToRgbTest('notacolor')).toBeNull();
+  });
+
+  it('white has luminance 1.0', () => {
+    expect(luminanceTest('#ffffff')).toBeCloseTo(1.0, 3);
+  });
+
+  it('black has luminance 0.0', () => {
+    expect(luminanceTest('#000000')).toBeCloseTo(0.0, 3);
+  });
+});

@@ -120,6 +120,7 @@ import { PathInspectorPanel } from './components/canvas/PathInspectorPanel';
 import { FontPairingPanel } from './components/canvas/FontPairingPanel';
 import { EasingCurvePanel } from './components/canvas/EasingCurvePanel';
 import { IconExportPanel } from './components/canvas/IconExportPanel';
+import { ContrastMatrixPanel } from './components/canvas/ContrastMatrixPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -509,6 +510,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showFontPairing, setShowFontPairing] = useState(false);
   const [showEasingCurve, setShowEasingCurve] = useState(false);
   const [showIconExport, setShowIconExport] = useState(false);
+  const [showContrastMatrix, setShowContrastMatrix] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -875,9 +877,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowAIQuickStyles(v => !v); return; }
             e.preventDefault(); startStickyNote(); showToast('Click canvas to place a sticky note', 'info'); return;
           }
-          // ── k — Command palette / Annotations / Breakpoint Ruler ──────────
+          // ── k — Command palette / Annotations / Breakpoint Ruler / Contrast Matrix ─
+          // ⌘⇧⌥K = Breakpoint Ruler, ⌘⌥K = Contrast Matrix, ⌘⇧K = Annotations, ⌘K = Command Palette
           case 'k': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowBreakpointRuler(v => !v); return; }
+            if (e.altKey) { e.preventDefault(); setShowContrastMatrix(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setAnnotationsActive(a => !a); showToast(annotationsActive ? 'Annotations off' : 'Annotation mode — click canvas to add', 'info'); return; }
             e.preventDefault(); setCommandPaletteOpen(o => !o); return;
           }
@@ -2741,6 +2745,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showIconExport}
         onClose={() => setShowIconExport(false)}
         selectedShape={selectedShape}
+      />
+
+      {/* Contrast Matrix Panel (⌘⌥K) */}
+      <ContrastMatrixPanel
+        open={showContrastMatrix}
+        onClose={() => setShowContrastMatrix(false)}
+        shapes={drawing.state.shapes}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
