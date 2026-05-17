@@ -2877,3 +2877,128 @@ describe('ZIndexVisualizerPanel utilities', () => {
     expect(b.maxY).toBe(350);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DesignMetricsPanel — inlined metric functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function countByTypeTest(shapes: Array<{ type: string }>): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const s of shapes) result[s.type] = (result[s.type] ?? 0) + 1;
+  return result;
+}
+
+function countGridAlignedTest(shapes: Array<{ x: number; y: number; width: number; height: number }>, grid = 8): number {
+  return shapes.filter(s =>
+    s.x % grid < 1 && s.y % grid < 1 && s.width % grid < 1 && s.height % grid < 1
+  ).length;
+}
+
+function countOverlapsTest(shapes: Array<{ x: number; y: number; width: number; height: number }>): number {
+  let count = 0;
+  for (let i = 0; i < shapes.length; i++) {
+    for (let j = i + 1; j < shapes.length; j++) {
+      const a = shapes[i];
+      const b = shapes[j];
+      if (a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y) count++;
+    }
+  }
+  return count;
+}
+
+function computeComplexityTest(totalShapes: number, uniqueFills: number, overlaps: number, utilPct: number, typeCount: number): number {
+  let score = 0;
+  score += Math.min(totalShapes / 50, 1) * 30;
+  score += Math.min(uniqueFills / 10, 1) * 20;
+  score += Math.min(overlaps / 10, 1) * 20;
+  score += utilPct / 100 * 15;
+  score += Math.min(typeCount / 5, 1) * 15;
+  return Math.round(score);
+}
+
+const makeMetricShape = (type: string, x: number, y: number, w: number, h: number, fill = '#ff0000') =>
+  ({ type, x, y, width: w, height: h, fill } as any);
+
+describe('DesignMetricsPanel utilities', () => {
+  // countByType
+  it('countByType: counts rect occurrences', () => {
+    const shapes = [makeMetricShape('rect', 0, 0, 100, 100), makeMetricShape('rect', 200, 0, 100, 100)];
+    expect(countByTypeTest(shapes)).toEqual({ rect: 2 });
+  });
+
+  it('countByType: mixed types', () => {
+    const shapes = [makeMetricShape('rect', 0, 0, 100, 100), makeMetricShape('ellipse', 0, 0, 50, 50)];
+    const bt = countByTypeTest(shapes);
+    expect(bt.rect).toBe(1);
+    expect(bt.ellipse).toBe(1);
+  });
+
+  // countGridAligned
+  it('countGridAligned: shapes on 8pt grid → counted', () => {
+    const shapes = [{ x: 0, y: 0, width: 64, height: 32 }];
+    expect(countGridAlignedTest(shapes)).toBe(1);
+  });
+
+  it('countGridAligned: off-grid shape → not counted', () => {
+    const shapes = [{ x: 3, y: 0, width: 64, height: 32 }];
+    expect(countGridAlignedTest(shapes)).toBe(0);
+  });
+
+  it('countGridAligned: mixed shapes', () => {
+    const shapes = [
+      { x: 0, y: 0, width: 64, height: 32 }, // on grid
+      { x: 7, y: 0, width: 64, height: 32 }, // off grid
+    ];
+    expect(countGridAlignedTest(shapes)).toBe(1);
+  });
+
+  // countOverlaps
+  it('countOverlaps: no overlap → 0', () => {
+    const shapes = [
+      { x: 0, y: 0, width: 50, height: 50 },
+      { x: 100, y: 100, width: 50, height: 50 },
+    ];
+    expect(countOverlapsTest(shapes)).toBe(0);
+  });
+
+  it('countOverlaps: two overlapping shapes → 1', () => {
+    const shapes = [
+      { x: 0, y: 0, width: 100, height: 100 },
+      { x: 50, y: 50, width: 100, height: 100 },
+    ];
+    expect(countOverlapsTest(shapes)).toBe(1);
+  });
+
+  it('countOverlaps: 3 mutually overlapping → 3 pairs', () => {
+    const shapes = [
+      { x: 0, y: 0, width: 200, height: 200 },
+      { x: 50, y: 50, width: 100, height: 100 },
+      { x: 80, y: 80, width: 60, height: 60 },
+    ];
+    expect(countOverlapsTest(shapes)).toBe(3);
+  });
+
+  it('countOverlaps: touching edges → no overlap', () => {
+    const shapes = [
+      { x: 0, y: 0, width: 100, height: 100 },
+      { x: 100, y: 0, width: 100, height: 100 },
+    ];
+    expect(countOverlapsTest(shapes)).toBe(0);
+  });
+
+  // computeComplexity
+  it('computeComplexity: empty canvas → 0', () => {
+    expect(computeComplexityTest(0, 0, 0, 0, 0)).toBe(0);
+  });
+
+  it('computeComplexity: max values → 100', () => {
+    // 50 shapes, 10 fills, 10 overlaps, 100% util, 5 types
+    expect(computeComplexityTest(50, 10, 10, 100, 5)).toBe(100);
+  });
+
+  it('computeComplexity: 10 shapes, 2 fills → moderate', () => {
+    const score = computeComplexityTest(10, 2, 0, 20, 2);
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThan(100);
+  });
+});

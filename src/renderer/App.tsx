@@ -131,6 +131,7 @@ import { BreakpointSimulatorPanel } from './components/canvas/BreakpointSimulato
 import { ComponentAnalyzerPanel } from './components/canvas/ComponentAnalyzerPanel';
 import { AnnotationOverlayPanel } from './components/canvas/AnnotationOverlayPanel';
 import { ZIndexVisualizerPanel } from './components/canvas/ZIndexVisualizerPanel';
+import { DesignMetricsPanel } from './components/canvas/DesignMetricsPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -531,6 +532,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showComponentAnalyzer, setShowComponentAnalyzer] = useState(false);
   const [showAnnotationOverlay, setShowAnnotationOverlay] = useState(false);
   const [showZIndexVisualizer, setShowZIndexVisualizer] = useState(false);
+  const [showDesignMetrics, setShowDesignMetrics] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -963,6 +965,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── s — Save / Frame sorter ───────────────────────────────────────
           case 's': {
             e.preventDefault();
+            if (e.shiftKey && e.altKey) { setShowDesignMetrics(v => !v); return; }
             if (e.altKey) { setShowFrameSorter(o => !o); return; }
             if (e.shiftKey) { handleSaveAsRef.current(); return; }
             handleSaveRef.current(); return;
@@ -2951,6 +2954,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             drawingRef.current.reorderShapes(arr);
           }
         }}
+      />
+
+      {/* Design Metrics Dashboard (⌘⌥⇧S) */}
+      <DesignMetricsPanel
+        open={showDesignMetrics}
+        onClose={() => setShowDesignMetrics(false)}
+        shapes={drawing.state.shapes}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
