@@ -103,6 +103,7 @@ import { AssetLibraryPanel, type Asset as LibraryAsset } from './components/canv
 import { SmartRenamePanel } from './components/canvas/SmartRenamePanel';
 import { CanvasComparePanel } from './components/canvas/CanvasComparePanel';
 import { MotionPreviewPanel } from './components/canvas/MotionPreviewPanel';
+import { MoodboardPanel, type MoodTheme } from './components/canvas/MoodboardPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -475,6 +476,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showSmartRename, setShowSmartRename] = useState(false);
   const [showCanvasCompare, setShowCanvasCompare] = useState(false);
   const [showMotionPreview, setShowMotionPreview] = useState(false);
+  const [showMoodboard, setShowMoodboard] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -763,11 +765,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { setShowAnimationTween(a => !a); return; }
             const d = drawingRef.current; if (d.state.shapes.length === 0) return; d.selectAll(); setActiveTool('cursor'); return;
           }
-          // ── b — Batch rename / Pattern fill / Color blind ─────────────────
-          // ⌘⇧⌥B = Pattern Fill, ⌘⇧B = Batch Rename
+          // ── b — Batch rename / Pattern fill / Moodboard ───────────────────
+          // ⌘⇧⌥B = Moodboard, ⌘⇧B = Batch Rename, ⌘⌥B = Pattern Fill
           case 'b': {
-            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPatternFill(p => !p); return; }
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMoodboard(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowBatchRename(o => !o); return; }
+            if (e.altKey) { e.preventDefault(); setShowPatternFill(p => !p); return; }
             break;
           }
           // ── c — Copy / Center / Content fill / Canvas Compare ─────────────
@@ -2453,6 +2456,41 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showMotionPreview}
         onClose={() => setShowMotionPreview(false)}
         selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+      />
+
+      {/* Moodboard Panel (⌘⇧⌥B) */}
+      <MoodboardPanel
+        open={showMoodboard}
+        onClose={() => setShowMoodboard(false)}
+        shapes={drawing.state.shapes}
+        onApplyPalette={(colorMap) => {
+          for (const { shapeId, color } of colorMap) {
+            drawingRef.current.updateShape(shapeId, { fill: color });
+          }
+          showToast('Palette applied to shapes', 'action');
+        }}
+        onGenerateShapes={(theme: MoodTheme) => {
+          // Generate 5 sample shapes in theme colors
+          const colors = theme.palette;
+          const sizes = [
+            { w: 320, h: 200, x: 80, y: 80 },
+            { w: 140, h: 140, x: 420, y: 80 },
+            { w: 200, h: 60, x: 420, y: 240 },
+            { w: 100, h: 100, x: 640, y: 80 },
+            { w: 100, h: 100, x: 640, y: 200 },
+          ];
+          sizes.forEach((s, i) => {
+            const shape = defaultShape('rectangle', uuid());
+            drawingRef.current.addShape({
+              ...shape,
+              x: s.x, y: s.y, width: s.w, height: s.h,
+              fill: colors[i % colors.length],
+              borderRadius: 8,
+              name: `${theme.name} ${i + 1}`,
+            });
+          });
+          showToast(`Generated ${theme.name} moodboard`, 'action');
+        }}
       />
 
       {/* Keyboard shortcuts overlay */}
