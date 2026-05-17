@@ -570,6 +570,18 @@ export function useDrawingTools(onShapesChange: (jsx: string, shapes: Shape[]) =
     emit(next, 'Ungroup');
   }, [emit]);
 
+  // ── Align shapes (used by AlignmentBar) ──────────────────────────────────
+
+  const alignShapes = useCallback((patches: { id: string; x: number; y: number }[]) => {
+    const { shapes } = stateRef.current;
+    const next = shapes.map(s => {
+      const patch = patches.find(p => p.id === s.id);
+      return patch ? { ...s, x: patch.x, y: patch.y } : s;
+    });
+    dispatch({ type: 'SET_SHAPES', shapes: next });
+    emit(next, 'Align shapes');
+  }, [emit]);
+
   // ── Add a single shape (used by AI frame injection) ───────────────────────
 
   const addShape = useCallback((shape: Shape) => {
@@ -759,6 +771,7 @@ export function useDrawingTools(onShapesChange: (jsx: string, shapes: Shape[]) =
     sendToBack,
     group,
     ungroup,
+    alignShapes,
     addShape,
     // Pen tool
     penPoints,

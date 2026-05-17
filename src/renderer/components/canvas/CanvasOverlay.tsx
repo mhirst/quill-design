@@ -386,7 +386,10 @@ export function CanvasOverlay({
       if (dragRef.current.type === 'draw') {
         const ox = dragRef.current.originX;
         const oy = dragRef.current.originY;
-        onDrawUpdate(x, y, ox, oy);
+        // Snap current cursor to other shapes' edges while drawing
+        const drawSnap = getSnapPoint(x, y, shapes, null, zoomRef.current);
+        setSnapLines({ x: drawSnap.snapX, y: drawSnap.snapY });
+        onDrawUpdate(drawSnap.x, drawSnap.y, ox, oy);
       } else if (dragRef.current.type === 'marquee') {
         const ox = dragRef.current.originX;
         const oy = dragRef.current.originY;

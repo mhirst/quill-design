@@ -21,6 +21,7 @@ import { patchTailwindClass as patchTailwindClassLocal } from './lib/utils';
 import { defaultShape } from './lib/shapes';
 import type { Shape } from './lib/shapes';
 import { ExportToolbar } from './components/canvas/ExportToolbar';
+import { AlignmentBar } from './components/canvas/AlignmentBar';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -473,23 +474,26 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename }: Works
 
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
         const d = drawingRef.current;
-        const sel = d.state.selectedId;
-        if (!sel) return;
+        const { selectedId, selectedIds, shapes } = d.state;
+        const idsToMove = selectedIds.length > 1 ? selectedIds : (selectedId ? [selectedId] : []);
+        if (idsToMove.length === 0) return;
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
-        const shape = d.state.shapes.find(s => s.id === sel);
-        if (!shape) return;
         let dx = 0, dy = 0;
         if (e.key === 'ArrowLeft')  dx = -step;
         if (e.key === 'ArrowRight') dx = +step;
         if (e.key === 'ArrowUp')    dy = -step;
         if (e.key === 'ArrowDown')  dy = +step;
-        // Path shapes: also translate all points
-        let patch: Partial<Shape> = { x: shape.x + dx, y: shape.y + dy };
-        if (shape.type === 'path' && shape.points) {
-          patch = { ...patch, points: shape.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+        for (const id of idsToMove) {
+          const shape = shapes.find(s => s.id === id);
+          if (!shape) continue;
+          // Path shapes: also translate all points
+          let patch: Partial<Shape> = { x: shape.x + dx, y: shape.y + dy };
+          if (shape.type === 'path' && shape.points) {
+            patch = { ...patch, points: shape.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+          }
+          d.updateShape(id, patch);
         }
-        d.updateShape(sel, patch);
       }
     }
     window.addEventListener('keydown', onKeyDown);
@@ -678,6 +682,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename }: Works
           />
 
           {drawing.state.shapes.length > 0 && <ExportToolbar shapes={drawing.state.shapes} />}
+
+          <AlignmentBar
+            shapes={drawing.state.shapes}
+            selectedIds={drawing.state.selectedIds}
+            onAlign={drawing.alignShapes}
+          />
 
           <CanvasOverlay
             activeTool={activeTool}
