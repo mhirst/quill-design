@@ -127,6 +127,7 @@ import { GeometryPanel } from './components/canvas/GeometryPanel';
 import { ColorTokensPanel } from './components/canvas/ColorTokensPanel';
 import { TypographyAuditPanel } from './components/canvas/TypographyAuditPanel';
 import { ShapeMorphPanel } from './components/canvas/ShapeMorphPanel';
+import { BreakpointSimulatorPanel } from './components/canvas/BreakpointSimulatorPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -523,6 +524,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showColorTokens, setShowColorTokens] = useState(false);
   const [showTypographyAudit, setShowTypographyAudit] = useState(false);
   const [showShapeMorph, setShowShapeMorph] = useState(false);
+  const [showBreakpointSim, setShowBreakpointSim] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1085,6 +1087,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── 8 — Shape Morpher ─────────────────────────────────────────────
           case '8': {
             if (e.altKey) { e.preventDefault(); setShowShapeMorph(v => !v); return; }
+            break;
+          }
+          // ── 9 — Breakpoint Simulator ──────────────────────────────────────
+          case '9': {
+            if (e.altKey) { e.preventDefault(); setShowBreakpointSim(v => !v); return; }
             break;
           }
           // ── ] [ — Z-order ─────────────────────────────────────────────────
@@ -2878,6 +2885,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           });
           showToast(`Inserted ${defs.length} morph frame${defs.length !== 1 ? 's' : ''}`, 'action');
         }}
+      />
+
+      {/* Breakpoint Simulator Panel (⌘⌥9) */}
+      <BreakpointSimulatorPanel
+        open={showBreakpointSim}
+        onClose={() => setShowBreakpointSim(false)}
+        shapes={drawing.state.shapes}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}

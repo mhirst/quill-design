@@ -2461,3 +2461,129 @@ describe('ShapeMorphPanel interpolation utilities', () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BreakpointSimulatorPanel — inlined utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TestBP { id: string; name: string; width: number; height: number; active: boolean; }
+interface TinyShape { id: string; x: number; y: number; width: number; height: number; }
+
+function getClippedShapesTest(shapes: TinyShape[], viewportWidth: number): string[] {
+  return shapes.filter(s => s.x + s.width > viewportWidth).map(s => s.id);
+}
+
+function getHiddenShapesTest(shapes: TinyShape[], viewportWidth: number): string[] {
+  return shapes.filter(s => s.x >= viewportWidth).map(s => s.id);
+}
+
+function previewScaleTest(canvasWidth: number, viewportWidth: number, paneWidth: number): number {
+  if (canvasWidth <= 0 || paneWidth <= 0) return 1;
+  return Math.min(paneWidth / viewportWidth, 1);
+}
+
+function sortBreakpointsTest(bps: TestBP[]): TestBP[] {
+  return [...bps].sort((a, b) => a.width - b.width);
+}
+
+function exportMediaQueriesTest(breakpoints: TestBP[], containerClass = '.container'): string {
+  const active = [...breakpoints].filter(b => b.active).sort((a, b) => a.width - b.width);
+  if (active.length === 0) return '/* No active breakpoints */';
+  const lines: string[] = [];
+  lines.push('/* Auto-generated breakpoint media queries */');
+  lines.push('');
+  lines.push(`/* Default — mobile (< ${active[0].width}px) */`);
+  lines.push(`${containerClass} { width: 100%; padding: 0 16px; }`);
+  lines.push('');
+  for (let i = 0; i < active.length; i++) {
+    const bp = active[i];
+    lines.push(`/* ${bp.name} — ${bp.width}px and up */`);
+    lines.push(`@media (min-width: ${bp.width}px) {`);
+    lines.push(`  ${containerClass} { max-width: ${bp.width}px; margin: 0 auto; }`);
+    lines.push(`}`);
+    if (i < active.length - 1) lines.push('');
+  }
+  return lines.join('\n');
+}
+
+const makeBP = (id: string, w: number, active = true): TestBP => ({
+  id, name: id, width: w, height: 800, active
+});
+
+describe('BreakpointSimulatorPanel utilities', () => {
+  // getClippedShapes
+  it('getClippedShapes: shape overflowing right edge', () => {
+    const shapes = [{ id: 's1', x: 300, y: 0, width: 200, height: 50 }];
+    expect(getClippedShapesTest(shapes, 375)).toContain('s1');
+  });
+
+  it('getClippedShapes: shape fitting within viewport', () => {
+    const shapes = [{ id: 's1', x: 0, y: 0, width: 300, height: 50 }];
+    expect(getClippedShapesTest(shapes, 375)).toHaveLength(0);
+  });
+
+  it('getClippedShapes: shape exactly at boundary (not clipped)', () => {
+    const shapes = [{ id: 's1', x: 0, y: 0, width: 375, height: 50 }];
+    expect(getClippedShapesTest(shapes, 375)).toHaveLength(0);
+  });
+
+  it('getClippedShapes: shape one pixel over boundary', () => {
+    const shapes = [{ id: 's1', x: 0, y: 0, width: 376, height: 50 }];
+    expect(getClippedShapesTest(shapes, 375)).toContain('s1');
+  });
+
+  // getHiddenShapes
+  it('getHiddenShapes: shape starting at viewport width → hidden', () => {
+    const shapes = [{ id: 's1', x: 375, y: 0, width: 100, height: 50 }];
+    expect(getHiddenShapesTest(shapes, 375)).toContain('s1');
+  });
+
+  it('getHiddenShapes: shape partially visible → not hidden', () => {
+    const shapes = [{ id: 's1', x: 300, y: 0, width: 100, height: 50 }];
+    expect(getHiddenShapesTest(shapes, 375)).toHaveLength(0);
+  });
+
+  // previewScale
+  it('previewScale: canvas fits in pane → scale ≤ 1', () => {
+    const scale = previewScaleTest(1440, 375, 140);
+    expect(scale).toBeLessThanOrEqual(1);
+  });
+
+  it('previewScale: zero canvas width → 1', () => {
+    expect(previewScaleTest(0, 375, 140)).toBe(1);
+  });
+
+  it('previewScale: viewport equals pane → scale = 1', () => {
+    expect(previewScaleTest(140, 140, 140)).toBeCloseTo(1, 5);
+  });
+
+  // sortBreakpoints
+  it('sortBreakpoints: sorts ascending by width', () => {
+    const bps = [makeBP('c', 1280), makeBP('a', 375), makeBP('b', 768)];
+    const sorted = sortBreakpointsTest(bps);
+    expect(sorted.map(b => b.width)).toEqual([375, 768, 1280]);
+  });
+
+  // exportMediaQueries
+  it('exportMediaQueries: no active → comment', () => {
+    const css = exportMediaQueriesTest([makeBP('a', 375, false)]);
+    expect(css).toBe('/* No active breakpoints */');
+  });
+
+  it('exportMediaQueries: contains @media rule', () => {
+    const css = exportMediaQueriesTest([makeBP('mobile', 375)]);
+    expect(css).toContain('@media (min-width: 375px)');
+  });
+
+  it('exportMediaQueries: mobile-first default before @media', () => {
+    const css = exportMediaQueriesTest([makeBP('tablet', 768), makeBP('mobile', 375)]);
+    const defaultIdx = css.indexOf('width: 100%');
+    const mediaIdx = css.indexOf('@media');
+    expect(defaultIdx).toBeLessThan(mediaIdx);
+  });
+
+  it('exportMediaQueries: uses custom container class', () => {
+    const css = exportMediaQueriesTest([makeBP('a', 375)], '.my-wrap');
+    expect(css).toContain('.my-wrap');
+  });
+});
