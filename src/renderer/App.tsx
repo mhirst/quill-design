@@ -112,6 +112,7 @@ import { ConsistencyAuditorPanel } from './components/canvas/ConsistencyAuditorP
 import { PerspectiveGridOverlay } from './components/canvas/PerspectiveGridOverlay';
 import { CSSSnippetPanel } from './components/canvas/CSSSnippetPanel';
 import { SpacingHeatmapOverlay } from './components/canvas/SpacingHeatmapOverlay';
+import { DesignDiffPanel } from './components/canvas/DesignDiffPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -493,6 +494,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showPerspectiveGrid, setShowPerspectiveGrid] = useState(false);
   const [showCSSSnippet, setShowCSSSnippet] = useState(false);
   const [showSpacingHeatmap, setShowSpacingHeatmap] = useState(false);
+  const [showDesignDiff, setShowDesignDiff] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -935,6 +937,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           case 'v': {
             e.preventDefault();
             if (e.shiftKey && e.altKey) { setShowVariableFont(v => !v); return; }
+            if (e.altKey && !e.shiftKey) { setShowDesignDiff(v => !v); return; }
             if (e.shiftKey) { drawingRef.current.pasteInPlace(); showToast('Pasted in place', 'action'); return; }
             // Try to paste image from clipboard first (if clipboard has image items)
             navigator.clipboard.read().then(items => {
@@ -2603,6 +2606,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         panY={viewport.panY}
         canvasWidth={canvasSize.width}
         canvasHeight={canvasSize.height}
+      />
+
+      {/* Design Diff Panel (⌘⌥V) */}
+      <DesignDiffPanel
+        open={showDesignDiff}
+        onClose={() => setShowDesignDiff(false)}
+        shapes={drawing.state.shapes}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
