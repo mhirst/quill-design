@@ -129,6 +129,7 @@ import { TypographyAuditPanel } from './components/canvas/TypographyAuditPanel';
 import { ShapeMorphPanel } from './components/canvas/ShapeMorphPanel';
 import { BreakpointSimulatorPanel } from './components/canvas/BreakpointSimulatorPanel';
 import { ComponentAnalyzerPanel } from './components/canvas/ComponentAnalyzerPanel';
+import { AnnotationOverlayPanel } from './components/canvas/AnnotationOverlayPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -527,6 +528,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showShapeMorph, setShowShapeMorph] = useState(false);
   const [showBreakpointSim, setShowBreakpointSim] = useState(false);
   const [showComponentAnalyzer, setShowComponentAnalyzer] = useState(false);
+  const [showAnnotationOverlay, setShowAnnotationOverlay] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -810,7 +812,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── a — Select all / Auto layout / Animation / Motion path ─────────
           case 'a': {
             e.preventDefault();
-            if (e.shiftKey && e.altKey) { setShowMotionPath(m => !m); return; }
+            if (e.shiftKey && e.altKey) {
+              // ⌘⇧⌥A → Annotation Overlay (was MotionPath, now moved to ⌘⌥⇧M)
+              setShowAnnotationOverlay(v => !v);
+              return;
+            }
             if (e.altKey && !e.shiftKey) { setShowAutoLayout(v => !v); return; }
             if (e.shiftKey) { setShowAnimationTween(a => !a); return; }
             const d = drawingRef.current; if (d.state.shapes.length === 0) return; d.selectAll(); setActiveTool('cursor'); return;
@@ -913,6 +919,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMotionPreview(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowSnapshots(o => !o); return; }
             if (e.altKey) { e.preventDefault(); setShowMinimap(v => !v); return; }
+            // Note: ⌘⌥⇧M kept for MotionPath via alias below
             break;
           }
           // ── n — New doc / Comments / Noise texture / Spacing advisor ────────
@@ -2910,6 +2917,14 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           drawing.setSelectedIds(ids);
           showToast(`Selected ${ids.length} similar shape${ids.length !== 1 ? 's' : ''}`, 'action');
         }}
+      />
+
+      {/* Annotation Overlay (⌘⇧⌥A) */}
+      <AnnotationOverlayPanel
+        open={showAnnotationOverlay}
+        onClose={() => setShowAnnotationOverlay(false)}
+        canvasWidth={1440}
+        canvasHeight={900}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}

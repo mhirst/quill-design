@@ -2695,3 +2695,88 @@ describe('ComponentAnalyzerPanel utilities', () => {
     expect(suggestComponentNameTest('pentagon', 'none', 2)).toBe('Component');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AnnotationOverlayPanel — inlined geometry utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface Pt { x: number; y: number; }
+
+function rdpSimplifyTest(points: Pt[], epsilon: number): Pt[] {
+  if (points.length < 3) return points;
+  let maxDist = 0;
+  let maxIdx = 0;
+  const start = points[0];
+  const end = points[points.length - 1];
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i];
+    const dist = len === 0
+      ? Math.sqrt((p.x - start.x) ** 2 + (p.y - start.y) ** 2)
+      : Math.abs((p.x - start.x) * dy - (p.y - start.y) * dx) / len;
+    if (dist > maxDist) { maxDist = dist; maxIdx = i; }
+  }
+  if (maxDist <= epsilon) return [start, end];
+  return [...rdpSimplifyTest(points.slice(0, maxIdx + 1), epsilon).slice(0, -1), ...rdpSimplifyTest(points.slice(maxIdx), epsilon)];
+}
+
+function pointsToSVGPathTest(points: Pt[]): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  const parts = [`M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`];
+  for (let i = 1; i < points.length; i++) {
+    parts.push(`L ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)}`);
+  }
+  return parts.join(' ');
+}
+
+describe('AnnotationOverlayPanel geometry utilities', () => {
+  // rdpSimplify
+  it('rdpSimplify: straight line → just endpoints', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }];
+    const simplified = rdpSimplifyTest(pts, 0.5);
+    expect(simplified).toHaveLength(2);
+    expect(simplified[0]).toEqual({ x: 0, y: 0 });
+    expect(simplified[simplified.length - 1]).toEqual({ x: 3, y: 0 });
+  });
+
+  it('rdpSimplify: sharp corner → 3 points preserved', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 0 }];
+    const simplified = rdpSimplifyTest(pts, 1);
+    expect(simplified.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('rdpSimplify: 2 points → unchanged', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 100, y: 100 }];
+    expect(rdpSimplifyTest(pts, 5)).toHaveLength(2);
+  });
+
+  it('rdpSimplify: large epsilon simplifies more', () => {
+    const pts = Array.from({ length: 20 }, (_, i) => ({ x: i * 5, y: Math.sin(i) * 3 }));
+    const tight = rdpSimplifyTest(pts, 0.1);
+    const loose = rdpSimplifyTest(pts, 5);
+    expect(tight.length).toBeGreaterThanOrEqual(loose.length);
+  });
+
+  // pointsToSVGPath
+  it('pointsToSVGPath: empty → ""', () => {
+    expect(pointsToSVGPathTest([])).toBe('');
+  });
+
+  it('pointsToSVGPath: single point → M command', () => {
+    expect(pointsToSVGPathTest([{ x: 10, y: 20 }])).toBe('M 10 20');
+  });
+
+  it('pointsToSVGPath: two points → M L', () => {
+    const d = pointsToSVGPathTest([{ x: 0, y: 0 }, { x: 100, y: 50 }]);
+    expect(d).toContain('M 0.0 0.0');
+    expect(d).toContain('L 100.0 50.0');
+  });
+
+  it('pointsToSVGPath: path starts with M', () => {
+    const d = pointsToSVGPathTest([{ x: 5, y: 10 }, { x: 20, y: 30 }]);
+    expect(d.startsWith('M')).toBe(true);
+  });
+});
