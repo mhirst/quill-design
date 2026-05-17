@@ -106,6 +106,7 @@ import { MotionPreviewPanel } from './components/canvas/MotionPreviewPanel';
 import { MoodboardPanel, type MoodTheme } from './components/canvas/MoodboardPanel';
 import { TypographySpecimenPanel } from './components/canvas/TypographySpecimenPanel';
 import { BreakpointRulerOverlay } from './components/canvas/BreakpointRulerOverlay';
+import { MicroInteractionPanel } from './components/canvas/MicroInteractionPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -481,6 +482,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showMoodboard, setShowMoodboard] = useState(false);
   const [showTypographySpecimen, setShowTypographySpecimen] = useState(false);
   const [showBreakpointRuler, setShowBreakpointRuler] = useState(false);
+  const [showMicroInteraction, setShowMicroInteraction] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -831,10 +833,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowFindReplace(o => !o); return; }
             break;
           }
-          // ── i — Image fill / Design intel ─────────────────────────────────
+          // ── i — Image fill / Design intel / Micro-interaction ─────────────
           case 'i': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowDesignIntel(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowImageFill(i => !i); return; }
+            if (e.altKey) { e.preventDefault(); setShowMicroInteraction(v => !v); return; }
             break;
           }
           // ── j — Layer effects / Sticky notes / AI Styles / Spacing ────────
@@ -2506,6 +2509,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           });
           showToast(`Generated ${theme.name} moodboard`, 'action');
         }}
+      />
+
+      {/* Micro-interaction Builder (⌘⌥I) */}
+      <MicroInteractionPanel
+        open={showMicroInteraction}
+        onClose={() => setShowMicroInteraction(false)}
+        selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
