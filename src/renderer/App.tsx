@@ -111,6 +111,7 @@ import { GridDuplicatorPanel, type ShapePatch } from './components/canvas/GridDu
 import { ConsistencyAuditorPanel } from './components/canvas/ConsistencyAuditorPanel';
 import { PerspectiveGridOverlay } from './components/canvas/PerspectiveGridOverlay';
 import { CSSSnippetPanel } from './components/canvas/CSSSnippetPanel';
+import { SpacingHeatmapOverlay } from './components/canvas/SpacingHeatmapOverlay';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -491,6 +492,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showConsistencyAudit, setShowConsistencyAudit] = useState(false);
   const [showPerspectiveGrid, setShowPerspectiveGrid] = useState(false);
   const [showCSSSnippet, setShowCSSSnippet] = useState(false);
+  const [showSpacingHeatmap, setShowSpacingHeatmap] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -978,6 +980,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           // ── w — Shadow studio / Variants ──────────────────────────────────
           case 'w': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowVariants(v => !v); return; }
+            if (e.altKey) { e.preventDefault(); setShowSpacingHeatmap(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowShadowStudio(s => !s); return; }
             break;
           }
@@ -2589,6 +2592,17 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showCSSSnippet}
         onClose={() => setShowCSSSnippet(false)}
         selectedShape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+      />
+
+      {/* Spacing Heatmap Overlay (⌘⌥W) */}
+      <SpacingHeatmapOverlay
+        open={showSpacingHeatmap}
+        shapes={drawing.state.shapes}
+        zoom={viewport.zoom}
+        panX={viewport.panX}
+        panY={viewport.panY}
+        canvasWidth={canvasSize.width}
+        canvasHeight={canvasSize.height}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
