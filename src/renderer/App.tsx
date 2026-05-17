@@ -156,6 +156,7 @@ import { ColorMixingPanel } from './components/canvas/ColorMixingPanel';
 import { GeometricProportionsPanel } from './components/canvas/GeometricProportionsPanel';
 import { SpacingScalePanel } from './components/canvas/SpacingScalePanel';
 import { BorderRadiusStudio } from './components/canvas/BorderRadiusStudio';
+import { AdvancedAlignmentPanel } from './components/canvas/AdvancedAlignmentPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -579,6 +580,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showGeometricProps, setShowGeometricProps] = useState(false);
   const [showSpacingScale, setShowSpacingScale] = useState(false);
   const [showBorderRadius, setShowBorderRadius] = useState(false);
+  const [showAdvancedAlignment, setShowAdvancedAlignment] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1148,8 +1150,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowGeometry(v => !v); return; }
             break;
           }
-          // ── 6 — Color Tokens ──────────────────────────────────────────────
+          // ── 6 — Color Tokens / CSS Grid / Advanced Alignment ──────────────
           case '6': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowAdvancedAlignment(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowCSSGrid(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowColorTokens(v => !v); return; }
             break;
@@ -3214,6 +3217,27 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onClose={() => setShowBorderRadius(false)}
         initialRadius={typeof selectedShape?.borderRadius === 'number' ? selectedShape.borderRadius : 8}
         onApply={selectedShape ? (r) => drawingRef.current.updateShape(selectedShape.id, { borderRadius: r }) : undefined}
+      />
+
+      {/* Advanced Alignment Panel (⌘⇧⌥6) */}
+      <AdvancedAlignmentPanel
+        open={showAdvancedAlignment}
+        onClose={() => setShowAdvancedAlignment(false)}
+        shapes={drawing.state.shapes}
+        selectedIds={[
+          ...(drawing.state.selectedId ? [drawing.state.selectedId] : []),
+          ...drawing.state.selectedIds,
+        ].filter((id, i, arr) => arr.indexOf(id) === i)}
+        onUpdate={(updates) => {
+          for (const u of updates) {
+            drawingRef.current.updateShape(u.id, {
+              ...(u.x !== undefined && { x: u.x }),
+              ...(u.y !== undefined && { y: u.y }),
+              ...(u.width !== undefined && { width: u.width }),
+              ...(u.height !== undefined && { height: u.height }),
+            });
+          }
+        }}
       />
 
       {/* Design Token Mapper (⌘⌥U) */}

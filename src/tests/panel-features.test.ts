@@ -6263,3 +6263,174 @@ describe('BorderRadiusStudio', () => {
     expect(presetNames).toHaveLength(17);
   });
 });
+
+// ── AdvancedAlignmentPanel ────────────────────────────────────────────────────
+
+interface AAShape { id: string; x: number; y: number; width: number; height: number; }
+
+function aaBounds(shapes: AAShape[]) {
+  if (!shapes.length) return null;
+  const left = Math.min(...shapes.map(s => s.x));
+  const top = Math.min(...shapes.map(s => s.y));
+  const right = Math.max(...shapes.map(s => s.x + s.width));
+  const bottom = Math.max(...shapes.map(s => s.y + s.height));
+  return { left, top, right, bottom, width: right-left, height: bottom-top, centerX: (left+right)/2, centerY: (top+bottom)/2 };
+}
+
+function aaAlignLeft(shapes: AAShape[], targetLeft: number) { return shapes.map(s => ({...s, x: targetLeft})); }
+function aaAlignRight(shapes: AAShape[], targetRight: number) { return shapes.map(s => ({...s, x: targetRight - s.width})); }
+function aaAlignHCenter(shapes: AAShape[], cx: number) { return shapes.map(s => ({...s, x: cx - s.width/2})); }
+function aaAlignTop(shapes: AAShape[], targetTop: number) { return shapes.map(s => ({...s, y: targetTop})); }
+function aaAlignBottom(shapes: AAShape[], targetBottom: number) { return shapes.map(s => ({...s, y: targetBottom - s.height})); }
+function aaAlignVCenter(shapes: AAShape[], cy: number) { return shapes.map(s => ({...s, y: cy - s.height/2})); }
+
+function aaDistH(shapes: AAShape[]) {
+  if (shapes.length < 3) return shapes;
+  const sorted = [...shapes].sort((a, b) => a.x - b.x);
+  const totalW = sorted.reduce((s, sh) => s + sh.width, 0);
+  const span = (sorted[sorted.length-1].x + sorted[sorted.length-1].width) - sorted[0].x;
+  const gap = (span - totalW) / (sorted.length - 1);
+  let x = sorted[0].x;
+  return sorted.map(s => { const r = {...s, x}; x += s.width + gap; return r; });
+}
+
+function aaDistV(shapes: AAShape[]) {
+  if (shapes.length < 3) return shapes;
+  const sorted = [...shapes].sort((a, b) => a.y - b.y);
+  const totalH = sorted.reduce((s, sh) => s + sh.height, 0);
+  const span = (sorted[sorted.length-1].y + sorted[sorted.length-1].height) - sorted[0].y;
+  const gap = (span - totalH) / (sorted.length - 1);
+  let y = sorted[0].y;
+  return sorted.map(s => { const r = {...s, y}; y += s.height + gap; return r; });
+}
+
+function aaHGaps(shapes: AAShape[]) {
+  const sorted = [...shapes].sort((a, b) => a.x - b.x);
+  const gaps: number[] = [];
+  for (let i = 1; i < sorted.length; i++) gaps.push(sorted[i].x - (sorted[i-1].x + sorted[i-1].width));
+  return gaps;
+}
+
+function aaVGaps(shapes: AAShape[]) {
+  const sorted = [...shapes].sort((a, b) => a.y - b.y);
+  const gaps: number[] = [];
+  for (let i = 1; i < sorted.length; i++) gaps.push(sorted[i].y - (sorted[i-1].y + sorted[i-1].height));
+  return gaps;
+}
+
+function aaStackH(shapes: AAShape[], gap: number) {
+  let x = Math.min(...shapes.map(s => s.x));
+  const top = Math.min(...shapes.map(s => s.y));
+  return shapes.map(s => { const r = {...s, x, y: top}; x += s.width + gap; return r; });
+}
+
+function aaEqualWidths(shapes: AAShape[]) {
+  const avg = Math.round(shapes.reduce((s, sh) => s + sh.width, 0) / shapes.length);
+  return shapes.map(s => ({...s, width: avg}));
+}
+
+const AA_SHAPES: AAShape[] = [
+  { id: 'a', x: 10, y: 10, width: 100, height: 50 },
+  { id: 'b', x: 200, y: 80, width: 80, height: 60 },
+  { id: 'c', x: 400, y: 30, width: 120, height: 40 },
+];
+
+describe('AdvancedAlignmentPanel', () => {
+  it('selectionBounds: correct bounds', () => {
+    const b = aaBounds(AA_SHAPES)!;
+    expect(b.left).toBe(10);
+    expect(b.top).toBe(10);
+    expect(b.right).toBe(520); // 400+120
+    expect(b.bottom).toBe(140); // 80+60
+  });
+
+  it('alignLeft: all shapes start at target left', () => {
+    const result = aaAlignLeft(AA_SHAPES, 50);
+    expect(result.every(s => s.x === 50)).toBe(true);
+  });
+
+  it('alignRight: all right edges at target', () => {
+    const result = aaAlignRight(AA_SHAPES, 500);
+    expect(result.every(s => s.x + s.width === 500)).toBe(true);
+  });
+
+  it('alignHCenter: centers all shapes at cx', () => {
+    const result = aaAlignHCenter(AA_SHAPES, 300);
+    expect(result.every(s => Math.abs((s.x + s.width/2) - 300) < 0.5)).toBe(true);
+  });
+
+  it('alignTop: all shapes at target top', () => {
+    const result = aaAlignTop(AA_SHAPES, 0);
+    expect(result.every(s => s.y === 0)).toBe(true);
+  });
+
+  it('alignBottom: all bottom edges at target', () => {
+    const result = aaAlignBottom(AA_SHAPES, 200);
+    expect(result.every(s => s.y + s.height === 200)).toBe(true);
+  });
+
+  it('alignVCenter: centers all at cy', () => {
+    const result = aaAlignVCenter(AA_SHAPES, 100);
+    expect(result.every(s => Math.abs((s.y + s.height/2) - 100) < 0.5)).toBe(true);
+  });
+
+  it('distributeH: gaps are equal after distribution', () => {
+    const result = aaDistH(AA_SHAPES);
+    const gaps = aaHGaps(result);
+    const diff = Math.max(...gaps) - Math.min(...gaps);
+    expect(diff).toBeLessThan(1);
+  });
+
+  it('distributeV: gaps are equal after distribution', () => {
+    const result = aaDistV(AA_SHAPES);
+    const gaps = aaVGaps(result);
+    const diff = Math.max(...gaps) - Math.min(...gaps);
+    expect(diff).toBeLessThan(1);
+  });
+
+  it('distributeH: preserves first and last position', () => {
+    const sorted = [...AA_SHAPES].sort((a, b) => a.x - b.x);
+    const result = aaDistH(AA_SHAPES);
+    const sortedResult = [...result].sort((a, b) => a.x - b.x);
+    expect(sortedResult[0].x).toBeCloseTo(sorted[0].x, 0);
+  });
+
+  it('stackH: shapes packed left-to-right with gap', () => {
+    const shapes: AAShape[] = [
+      { id: '1', x: 100, y: 50, width: 80, height: 40 },
+      { id: '2', x: 200, y: 70, width: 60, height: 40 },
+    ];
+    const result = aaStackH(shapes, 10);
+    expect(result[0].x).toBe(100); // first keeps original x
+    expect(result[1].x).toBe(100 + 80 + 10); // 190
+    expect(result.every(s => s.y === 50)).toBe(true); // all at top
+  });
+
+  it('equalizeWidths: all same width', () => {
+    const result = aaEqualWidths(AA_SHAPES);
+    const widths = result.map(s => s.width);
+    expect(Math.max(...widths)).toBe(Math.min(...widths));
+  });
+
+  it('equalizeWidths: average is correct', () => {
+    // (100+80+120)/3 = 100
+    const result = aaEqualWidths(AA_SHAPES);
+    expect(result[0].width).toBe(100);
+  });
+
+  it('hGaps: gaps before distribution are uneven', () => {
+    const gaps = aaHGaps(AA_SHAPES);
+    // a→b: 200-(10+100)=90, b→c: 400-(200+80)=120
+    expect(gaps[0]).toBe(90);
+    expect(gaps[1]).toBe(120);
+  });
+
+  it('selectionBounds: centerX is midpoint', () => {
+    const b = aaBounds(AA_SHAPES)!;
+    expect(b.centerX).toBeCloseTo((10 + 520) / 2, 0);
+  });
+
+  it('selectionBounds: empty → null', () => {
+    expect(aaBounds([])).toBeNull();
+  });
+});
