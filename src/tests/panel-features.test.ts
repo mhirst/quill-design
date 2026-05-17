@@ -5880,3 +5880,141 @@ describe('ColorMixingPanel', () => {
     }
   });
 });
+
+// ── GeometricProportionsPanel ─────────────────────────────────────────────────
+
+const GPP_PHI = 1.6180339887;
+const GPP_SQRT2 = 1.4142135623;
+const GPP_FIB = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610];
+
+function gppNearestFib(value: number): { value: number; index: number } {
+  let best = 0; let bestDiff = Infinity;
+  for (let i = 0; i < GPP_FIB.length; i++) {
+    const diff = Math.abs(GPP_FIB[i] - value);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  }
+  return { value: GPP_FIB[best], index: best };
+}
+
+function gppNearestPreset(ratio: number): { name: string; diff: number } | null {
+  const presets = [
+    { name: 'Golden', ratio: GPP_PHI },
+    { name: 'Square', ratio: 1 },
+    { name: '√2', ratio: GPP_SQRT2 },
+    { name: '4:3', ratio: 4/3 },
+    { name: '16:9', ratio: 16/9 },
+  ];
+  let best = null; let bestDiff = Infinity;
+  for (const p of presets) {
+    const diff = Math.abs(ratio - p.ratio);
+    if (diff < bestDiff) { bestDiff = diff; best = { name: p.name, diff }; }
+  }
+  return best;
+}
+
+function gppAspectLabel(ratio: number): string {
+  const candidates: [number, number][] = [[1,1],[4,3],[3,2],[16,9],[2,1],[21,9]];
+  let best = ''; let bestDiff = 0.02;
+  for (const [w, h] of candidates) {
+    const diff = Math.abs(ratio - w/h);
+    if (diff < bestDiff) { bestDiff = diff; best = `${w}:${h}`; }
+  }
+  return best || `${ratio.toFixed(3)}:1`;
+}
+
+function gppGoldenDims(base: number, fixed: 'width' | 'height') {
+  if (fixed === 'width') return { width: Math.round(base), height: Math.round(base / GPP_PHI) };
+  return { width: Math.round(base * GPP_PHI), height: Math.round(base) };
+}
+
+describe('GeometricProportionsPanel', () => {
+  it('PHI constant is approximately 1.618', () => {
+    expect(GPP_PHI).toBeCloseTo(1.618, 3);
+  });
+
+  it('nearestFib: 16 → 13 (index 6)', () => {
+    const r = gppNearestFib(16);
+    expect(r.value).toBe(13);
+  });
+
+  it('nearestFib: 8 → exact match 8', () => {
+    expect(gppNearestFib(8).value).toBe(8);
+  });
+
+  it('nearestFib: 200 → 144 or 233', () => {
+    const r = gppNearestFib(200);
+    expect([144, 233]).toContain(r.value);
+  });
+
+  it('nearestFib: 0 → 1', () => {
+    expect(gppNearestFib(0).value).toBe(1);
+  });
+
+  it('nearestPreset: 1.618 ratio → Golden', () => {
+    const r = gppNearestPreset(GPP_PHI);
+    expect(r?.name).toBe('Golden');
+    expect(r?.diff).toBeCloseTo(0, 5);
+  });
+
+  it('nearestPreset: 1.0 ratio → Square', () => {
+    expect(gppNearestPreset(1.0)?.name).toBe('Square');
+  });
+
+  it('nearestPreset: 16/9 → 16:9', () => {
+    expect(gppNearestPreset(16/9)?.name).toBe('16:9');
+  });
+
+  it('aspectLabel: exact 16:9', () => {
+    expect(gppAspectLabel(16/9)).toBe('16:9');
+  });
+
+  it('aspectLabel: exact 4:3', () => {
+    expect(gppAspectLabel(4/3)).toBe('4:3');
+  });
+
+  it('aspectLabel: 1:1', () => {
+    expect(gppAspectLabel(1)).toBe('1:1');
+  });
+
+  it('aspectLabel: custom ratio → decimal form', () => {
+    const label = gppAspectLabel(2.7);
+    expect(label).toMatch(/^\d+\.\d+:1$/);
+  });
+
+  it('goldenDims: fix width 400 → height ~247', () => {
+    const dims = gppGoldenDims(400, 'width');
+    expect(dims.width).toBe(400);
+    expect(dims.height).toBeCloseTo(400 / GPP_PHI, 0);
+  });
+
+  it('goldenDims: fix height 300 → width ~485', () => {
+    const dims = gppGoldenDims(300, 'height');
+    expect(dims.height).toBe(300);
+    expect(dims.width).toBeCloseTo(300 * GPP_PHI, 0);
+  });
+
+  it('diagonal: 300×400 → 500 (3-4-5 triangle)', () => {
+    const diag = Math.sqrt(300*300 + 400*400);
+    expect(diag).toBe(500);
+  });
+
+  it('fibonacci series has expected values', () => {
+    expect(GPP_FIB[0]).toBe(1);
+    expect(GPP_FIB[1]).toBe(1);
+    expect(GPP_FIB[6]).toBe(13);
+    expect(GPP_FIB[7]).toBe(21);
+  });
+
+  it('proportionDiff: golden vs actual 1.5 → ~7.3%', () => {
+    const diff = Math.abs((1.5 - GPP_PHI) / GPP_PHI) * 100;
+    expect(diff).toBeCloseTo(7.3, 0);
+  });
+
+  it('isSquare: 100×100 → true', () => {
+    expect(Math.abs(100/100 - 1) < 0.02).toBe(true);
+  });
+
+  it('isSquare: 100×110 → false (ratio too far from 1)', () => {
+    expect(Math.abs(100/110 - 1) < 0.02).toBe(false);
+  });
+});
