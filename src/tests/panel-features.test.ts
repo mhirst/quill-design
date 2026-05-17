@@ -4025,3 +4025,186 @@ describe('DesignSystemHealthPanel utilities', () => {
     expect(dsComputeHealthScore([], 100)).toBe(100);
   });
 });
+
+// ── ShapeTimelinePanel ─────────────────────────────────────────────────────────
+
+// Inlined utilities from ShapeTimelinePanel.tsx
+
+type TLEasing = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'spring';
+type TLProp = 'opacity' | 'x' | 'y' | 'scale' | 'rotate';
+
+interface TLKeyframe { id: string; time: number; property: TLProp; value: number; easing: TLEasing; }
+interface TLTrack { id: string; shapeId: string; shapeName: string; delay: number; keyframes: TLKeyframe[]; color: string; }
+
+function tlTrackId(): string { return 'trk-' + Math.random().toString(36).slice(2, 8); }
+
+function tlCreateTrack(shapeId: string, shapeName: string, color = '#b5533c'): TLTrack {
+  return { id: tlTrackId(), shapeId, shapeName, delay: 0, keyframes: [], color };
+}
+
+function tlAddKeyframe(track: TLTrack, kf: Omit<TLKeyframe, 'id'>): TLTrack {
+  const newKf: TLKeyframe = { ...kf, id: 'kf-' + Math.random().toString(36).slice(2, 8) };
+  const keyframes = [...track.keyframes, newKf].sort((a, b) => a.time - b.time);
+  return { ...track, keyframes };
+}
+
+function tlRemoveKeyframe(track: TLTrack, kfId: string): TLTrack {
+  return { ...track, keyframes: track.keyframes.filter(k => k.id !== kfId) };
+}
+
+function tlTrackProperties(track: TLTrack): TLProp[] {
+  return [...new Set(track.keyframes.map(k => k.property))];
+}
+
+function tlApplyEasing(t: number, easing: TLEasing): number {
+  switch (easing) {
+    case 'ease-in': return t * t * t;
+    case 'ease-out': return 1 - Math.pow(1 - t, 3);
+    case 'ease-in-out': return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    default: return t;
+  }
+}
+
+function tlInterpolate(track: TLTrack, property: TLProp, time: number): number | null {
+  const kfs = track.keyframes.filter(k => k.property === property).sort((a, b) => a.time - b.time);
+  if (kfs.length === 0) return null;
+  if (time <= kfs[0].time) return kfs[0].value;
+  if (time >= kfs[kfs.length - 1].time) return kfs[kfs.length - 1].value;
+  for (let i = 0; i < kfs.length - 1; i++) {
+    const a = kfs[i]; const b = kfs[i + 1];
+    if (time >= a.time && time <= b.time) {
+      const t = (time - a.time) / (b.time - a.time);
+      return a.value + (b.value - a.value) * tlApplyEasing(t, b.easing);
+    }
+  }
+  return null;
+}
+
+function tlTrackDuration(track: TLTrack): number {
+  if (track.keyframes.length === 0) return 0;
+  return track.delay + Math.max(...track.keyframes.map(k => k.time));
+}
+
+function tlTotalDuration(tracks: TLTrack[]): number {
+  return Math.max(0, ...tracks.map(tlTrackDuration));
+}
+
+describe('ShapeTimelinePanel utilities', () => {
+  // createTrack
+  it('createTrack: creates track with correct shapeId', () => {
+    const t = tlCreateTrack('shape-1', 'Box');
+    expect(t.shapeId).toBe('shape-1');
+    expect(t.shapeName).toBe('Box');
+    expect(t.keyframes).toHaveLength(0);
+  });
+
+  it('createTrack: unique ids', () => {
+    const a = tlCreateTrack('a', 'A');
+    const b = tlCreateTrack('b', 'B');
+    expect(a.id).not.toBe(b.id);
+  });
+
+  // addKeyframe
+  it('addKeyframe: adds keyframe sorted by time', () => {
+    let track = tlCreateTrack('s1', 'S1');
+    track = tlAddKeyframe(track, { time: 500, property: 'opacity', value: 0, easing: 'linear' });
+    track = tlAddKeyframe(track, { time: 100, property: 'opacity', value: 1, easing: 'linear' });
+    expect(track.keyframes[0].time).toBe(100);
+    expect(track.keyframes[1].time).toBe(500);
+  });
+
+  it('addKeyframe: keyframe count increases', () => {
+    let track = tlCreateTrack('s1', 'S1');
+    track = tlAddKeyframe(track, { time: 0, property: 'x', value: 0, easing: 'linear' });
+    expect(track.keyframes).toHaveLength(1);
+  });
+
+  // removeKeyframe
+  it('removeKeyframe: removes by id', () => {
+    let track = tlCreateTrack('s1', 'S1');
+    track = tlAddKeyframe(track, { time: 0, property: 'x', value: 0, easing: 'linear' });
+    const kfId = track.keyframes[0].id;
+    track = tlRemoveKeyframe(track, kfId);
+    expect(track.keyframes).toHaveLength(0);
+  });
+
+  // trackProperties
+  it('trackProperties: returns unique properties', () => {
+    let track = tlCreateTrack('s1', 'S1');
+    track = tlAddKeyframe(track, { time: 0, property: 'opacity', value: 1, easing: 'linear' });
+    track = tlAddKeyframe(track, { time: 500, property: 'opacity', value: 0, easing: 'linear' });
+    track = tlAddKeyframe(track, { time: 0, property: 'x', value: 0, easing: 'linear' });
+    const props = tlTrackProperties(track);
+    expect(props).toHaveLength(2);
+    expect(props).toContain('opacity');
+    expect(props).toContain('x');
+  });
+
+  // applyEasing
+  it('applyEasing: linear → identity', () => {
+    expect(tlApplyEasing(0.5, 'linear')).toBeCloseTo(0.5);
+  });
+
+  it('applyEasing: ease-in → t=0 → 0', () => {
+    expect(tlApplyEasing(0, 'ease-in')).toBeCloseTo(0);
+  });
+
+  it('applyEasing: ease-out → t=1 → 1', () => {
+    expect(tlApplyEasing(1, 'ease-out')).toBeCloseTo(1);
+  });
+
+  it('applyEasing: ease-in-out → t=0.5 → 0.5', () => {
+    expect(tlApplyEasing(0.5, 'ease-in-out')).toBeCloseTo(0.5);
+  });
+
+  // interpolateValue
+  it('interpolateValue: before first keyframe → first value', () => {
+    let track = tlCreateTrack('s1', 'S1');
+    track = tlAddKeyframe(track, { time: 100, property: 'opacity', value: 0.5, easing: 'linear' });
+    expect(tlInterpolate(track, 'opacity', 0)).toBeCloseTo(0.5);
+  });
+
+  it('interpolateValue: after last keyframe → last value', () => {
+    let track = tlCreateTrack('s1', 'S1');
+    track = tlAddKeyframe(track, { time: 100, property: 'opacity', value: 0.5, easing: 'linear' });
+    expect(tlInterpolate(track, 'opacity', 1000)).toBeCloseTo(0.5);
+  });
+
+  it('interpolateValue: between keyframes → interpolated', () => {
+    let track = tlCreateTrack('s1', 'S1');
+    track = tlAddKeyframe(track, { time: 0, property: 'x', value: 0, easing: 'linear' });
+    track = tlAddKeyframe(track, { time: 100, property: 'x', value: 100, easing: 'linear' });
+    const val = tlInterpolate(track, 'x', 50);
+    expect(val).toBeCloseTo(50);
+  });
+
+  it('interpolateValue: no keyframes for property → null', () => {
+    const track = tlCreateTrack('s1', 'S1');
+    expect(tlInterpolate(track, 'opacity', 50)).toBeNull();
+  });
+
+  // trackDuration
+  it('trackDuration: no keyframes → 0', () => {
+    expect(tlTrackDuration(tlCreateTrack('s1', 'S1'))).toBe(0);
+  });
+
+  it('trackDuration: delay + last keyframe time', () => {
+    let track = { ...tlCreateTrack('s1', 'S1'), delay: 200 };
+    track = tlAddKeyframe(track, { time: 0, property: 'x', value: 0, easing: 'linear' });
+    track = tlAddKeyframe(track, { time: 800, property: 'x', value: 100, easing: 'linear' });
+    expect(tlTrackDuration(track)).toBe(1000);
+  });
+
+  // totalDuration
+  it('totalDuration: max across tracks', () => {
+    let t1 = tlCreateTrack('a', 'A');
+    let t2 = tlCreateTrack('b', 'B');
+    t1 = tlAddKeyframe(t1, { time: 500, property: 'opacity', value: 1, easing: 'linear' });
+    t2 = tlAddKeyframe(t2, { time: 800, property: 'opacity', value: 0, easing: 'linear' });
+    expect(tlTotalDuration([t1, t2])).toBe(800);
+  });
+
+  it('totalDuration: no tracks → 0', () => {
+    expect(tlTotalDuration([])).toBe(0);
+  });
+});

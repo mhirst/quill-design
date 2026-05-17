@@ -138,6 +138,7 @@ import { VariableFontExplorerPanel } from './components/canvas/VariableFontExplo
 import { BlendModesPanel } from './components/canvas/BlendModesPanel';
 import { SnapGuideManagerPanel } from './components/canvas/SnapGuideManagerPanel';
 import { DesignSystemHealthPanel } from './components/canvas/DesignSystemHealthPanel';
+import { ShapeTimelinePanel } from './components/canvas/ShapeTimelinePanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -545,6 +546,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showBlendModes, setShowBlendModes] = useState(false);
   const [showSnapGuideManager, setShowSnapGuideManager] = useState(false);
   const [showDesignSystemHealth, setShowDesignSystemHealth] = useState(false);
+  const [showShapeTimeline, setShowShapeTimeline] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -962,11 +964,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowPathInspector(v => !v); return; }
             e.preventDefault(); setShowThemeCustomizer(o => !o); return;
           }
-          // ── q — Clip path editor ──────────────────────────────────────────
+          // ── q — Clip path editor / Shape Timeline ────────────────────────
           case 'q': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowConsistencyAudit(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowClipPath(c => !c); return; }
-            break;
+            // ⌘Q = Shape Timeline Sequencer
+            e.preventDefault(); setShowShapeTimeline(v => !v); return;
           }
           // ── r — Color replace / Rulers / Responsive preview / Smart Rename / Icon Export
           // ⌘⇧⌥R = Responsive Preview, ⌘⇧R = Smart Rename, ⌘⌥R = Icon Export, ⌘R = Rulers
@@ -3044,6 +3047,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onAutoFix={(shapeId, field, value) => {
           drawingRef.current.updateShape(shapeId, { [field]: value } as any);
         }}
+      />
+
+      {/* Shape Timeline Sequencer (⌘Q) */}
+      <ShapeTimelinePanel
+        open={showShapeTimeline}
+        onClose={() => setShowShapeTimeline(false)}
+        shapes={drawing.state.shapes}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
