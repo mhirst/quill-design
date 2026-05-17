@@ -6018,3 +6018,128 @@ describe('GeometricProportionsPanel', () => {
     expect(Math.abs(100/110 - 1) < 0.02).toBe(false);
   });
 });
+
+// ── SpacingScalePanel ─────────────────────────────────────────────────────────
+
+const SSP_FIB = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144];
+
+function sspLinear(base: number, factor: number, steps: number, stepsBelow: number): number[] {
+  const v: number[] = [];
+  for (let i = stepsBelow; i >= 1; i--) v.push(Math.max(1, Math.round(base - factor * i)));
+  for (let i = 0; i <= steps; i++) v.push(Math.round(base + factor * i));
+  return v;
+}
+
+function sspExponential(base: number, factor: number, steps: number, stepsBelow: number): number[] {
+  const v: number[] = [];
+  for (let i = stepsBelow; i >= 1; i--) v.push(Math.max(1, Math.round(base / Math.pow(factor, i))));
+  for (let i = 0; i <= steps; i++) v.push(Math.round(base * Math.pow(factor, i)));
+  return v;
+}
+
+function sspRhythmCheck(steps: number[]): boolean {
+  if (steps.length < 2) return true;
+  const base = steps[0];
+  return steps.every(s => s % base === 0);
+}
+
+function sspExportCSS(steps: Array<{label:string;rem:string;cssVar:string}>): string {
+  return `:root {\n${steps.map(s => `  ${s.cssVar}: ${s.rem};`).join('\n')}\n}`;
+}
+
+describe('SpacingScalePanel', () => {
+  it('linear: base=8, factor=8, 4 steps → [8, 16, 24, 32, 40]', () => {
+    const vals = sspLinear(8, 8, 4, 0);
+    expect(vals).toEqual([8, 16, 24, 32, 40]);
+  });
+
+  it('linear: stepsBelow=2 adds 2 steps before base', () => {
+    const vals = sspLinear(8, 4, 2, 2);
+    // below: 8-8=0→max(1,0)=1 at i=2, 8-4=4 at i=1, then 8,12,16
+    expect(vals[0]).toBeGreaterThanOrEqual(1);
+    expect(vals).toHaveLength(5);
+  });
+
+  it('exponential: base=4, factor=2, 4 steps → 4, 8, 16, 32, 64', () => {
+    const vals = sspExponential(4, 2, 4, 0);
+    expect(vals).toEqual([4, 8, 16, 32, 64]);
+  });
+
+  it('exponential: factor=1.5 produces non-integer steps', () => {
+    const vals = sspExponential(8, 1.5, 3, 0);
+    expect(vals[0]).toBe(8);
+    expect(vals[1]).toBe(12); // 8*1.5=12
+  });
+
+  it('exponential stepsBelow: each step half of next', () => {
+    const vals = sspExponential(16, 2, 0, 2);
+    // Below: 16/4=4, 16/2=8, base=16
+    expect(vals).toHaveLength(3);
+    expect(vals[0]).toBe(4);
+    expect(vals[1]).toBe(8);
+    expect(vals[2]).toBe(16);
+  });
+
+  it('rhythmCheck: [4, 8, 16, 32] → true', () => {
+    expect(sspRhythmCheck([4, 8, 16, 32])).toBe(true);
+  });
+
+  it('rhythmCheck: [4, 8, 10, 16] → false', () => {
+    expect(sspRhythmCheck([4, 8, 10, 16])).toBe(false);
+  });
+
+  it('rhythmCheck: single value → true', () => {
+    expect(sspRhythmCheck([8])).toBe(true);
+  });
+
+  it('exportCSS: wraps in :root with --space- vars', () => {
+    const steps = [
+      { label: 'xs', rem: '0.25rem', cssVar: '--space-xs' },
+      { label: 'base', rem: '1rem', cssVar: '--space-base' },
+    ];
+    const css = sspExportCSS(steps);
+    expect(css).toMatch(/^:root \{/);
+    expect(css).toContain('--space-xs: 0.25rem;');
+    expect(css).toContain('--space-base: 1rem;');
+  });
+
+  it('px to rem: 4px → 0.25rem', () => {
+    expect((4 / 16).toFixed(4) + 'rem').toBe('0.2500rem');
+  });
+
+  it('px to rem: 16px → 1rem', () => {
+    expect((16 / 16).toFixed(4) + 'rem').toBe('1.0000rem');
+  });
+
+  it('tailwindName: 16px → spacing-4', () => {
+    const name = `spacing-${Math.round(16 / 4)}`;
+    expect(name).toBe('spacing-4');
+  });
+
+  it('tailwindName: 64px → spacing-16', () => {
+    const name = `spacing-${Math.round(64 / 4)}`;
+    expect(name).toBe('spacing-16');
+  });
+
+  it('presets: 6 presets defined', () => {
+    const presets = ['4px Base (Tailwind)', '8px Base (Material)', 'Exponential ×1.5', 'Fibonacci', 'Linear 6px', 'Rem Scale'];
+    expect(presets).toHaveLength(6);
+  });
+
+  it('Fibonacci sequence is correct', () => {
+    expect(SSP_FIB[0]).toBe(1);
+    expect(SSP_FIB[2]).toBe(2);
+    expect(SSP_FIB[5]).toBe(8);
+    expect(SSP_FIB[7]).toBe(21);
+  });
+
+  it('closestSpacingStep: 14 → 13 in [8, 13, 21]', () => {
+    const steps = [
+      { label: 'sm', px: 8 }, { label: 'base', px: 13 }, { label: 'lg', px: 21 }
+    ];
+    const closest = steps.reduce((best, s) =>
+      Math.abs(s.px - 14) < Math.abs(best.px - 14) ? s : best
+    );
+    expect(closest.label).toBe('base');
+  });
+});

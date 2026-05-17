@@ -154,6 +154,7 @@ import { ShadowBuilderPanel } from './components/canvas/ShadowBuilderPanel';
 import { TypographyScaleInspector } from './components/canvas/TypographyScaleInspector';
 import { ColorMixingPanel } from './components/canvas/ColorMixingPanel';
 import { GeometricProportionsPanel } from './components/canvas/GeometricProportionsPanel';
+import { SpacingScalePanel } from './components/canvas/SpacingScalePanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -575,6 +576,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showTypoScaleInspector, setShowTypoScaleInspector] = useState(false);
   const [showColorMixing, setShowColorMixing] = useState(false);
   const [showGeometricProps, setShowGeometricProps] = useState(false);
+  const [showSpacingScale, setShowSpacingScale] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1130,8 +1132,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowLayerStack(v => !v); return; }
             break;
           }
-          // ── 4 — Handoff Spec / Spacing Tokens ────────────────────────────
+          // ── 4 — Handoff Spec / Spacing Tokens / Spacing Scale ────────────
           case '4': {
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowSpacingScale(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowSpacingTokens(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowHandoffSpec(v => !v); return; }
             break;
@@ -3194,6 +3197,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onClose={() => setShowGeometricProps(false)}
         selectedShape={selectedShape}
         onResize={selectedShape ? (w, h) => drawingRef.current.updateShape(selectedShape.id, { width: w, height: h }) : undefined}
+      />
+
+      {/* Spacing Scale Panel (⌘⇧⌥4) */}
+      <SpacingScalePanel
+        open={showSpacingScale}
+        onClose={() => setShowSpacingScale(false)}
       />
 
       {/* Design Token Mapper (⌘⌥U) */}
