@@ -91,6 +91,10 @@ import { PaletteExtractorPanel } from './components/canvas/PaletteExtractorPanel
 import { TemplateGallery } from './components/canvas/TemplateGallery';
 import { AutoLayoutPanel } from './components/canvas/AutoLayoutPanel';
 import { LayerEffectsPanel } from './components/canvas/LayerEffectsPanel';
+import { SmartSpacingAdvisor } from './components/canvas/SmartSpacingAdvisor';
+import { AIQuickSuggestionsPanel } from './components/canvas/AIQuickSuggestionsPanel';
+import { FocusMode } from './components/canvas/FocusMode';
+import { CursorPresence, CursorPresencePanel } from './components/canvas/CursorPresence';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -450,6 +454,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showAutoLayout, setShowAutoLayout] = useState(false);
   const [showLayerEffects, setShowLayerEffects] = useState(false);
+  const [showSpacingAdvisor, setShowSpacingAdvisor] = useState(false);
+  const [showAIQuickStyles, setShowAIQuickStyles] = useState(false);
+  const [focusModeActive, setFocusModeActive] = useState(false);
+  const [showCursorPresence, setShowCursorPresence] = useState(false);
+  const [showPresencePanel, setShowPresencePanel] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -775,10 +784,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowDevSpec(o => !o); return; }
             break;
           }
-          // ── f — Spotlight / Custom fonts / Fluid type ─────────────────────
+          // ── f — Spotlight / Custom fonts / Fluid type / Focus Mode ────────
+          // ⌘⇧⌥F = Fluid Type, ⌘⇧F = Focus Mode, ⌘F = Spotlight
           case 'f': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowFluidType(f => !f); return; }
-            if (e.shiftKey) { e.preventDefault(); setShowCustomFonts(o => !o); return; }
+            if (e.shiftKey) { e.preventDefault(); setFocusModeActive(f => !f); showToast(focusModeActive ? 'Focus mode off' : 'Focus mode on', 'info'); return; }
             e.preventDefault(); setShowSpotlight(o => !o); return;
           }
           // ── g — Group / Ungroup / Generative art / Wrap in frame ──────────
@@ -802,11 +812,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowImageFill(i => !i); return; }
             break;
           }
-          // ── j — Layer effects / Sticky notes ──────────────────────────────
+          // ── j — Layer effects / Sticky notes / AI Styles / Spacing ────────
+          // ⌘⇧⌥J = Layer Effects, ⌘⇧J = AI Quick Styles, ⌘J = Sticky note
           case 'j': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowLayerEffects(v => !v); return; }
-            if (e.shiftKey) { e.preventDefault(); startStickyNote(); showToast('Click canvas to place a sticky note', 'info'); return; }
-            break;
+            if (e.shiftKey) { e.preventDefault(); setShowAIQuickStyles(v => !v); return; }
+            e.preventDefault(); startStickyNote(); showToast('Click canvas to place a sticky note', 'info'); return;
           }
           // ── k — Command palette / Annotations ─────────────────────────────
           case 'k': {
@@ -826,11 +837,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowMinimap(v => !v); return; }
             break;
           }
-          // ── n — New doc / Comments / Noise texture ────────────────────────
+          // ── n — New doc / Comments / Noise texture / Spacing advisor ────────
+          // ⌘⇧⌥N = Spacing Advisor, ⌘⇧N = Comment Mode, ⌘N = New Doc
           case 'n': {
             e.preventDefault();
-            if (e.shiftKey && e.altKey) { setShowNoiseTexture(v => !v); return; }
+            if (e.shiftKey && e.altKey) { setShowSpacingAdvisor(v => !v); return; }
             if (e.shiftKey) { setCommentMode(m => !m); return; }
+            if (e.altKey) { setShowNoiseTexture(v => !v); return; }
             handleNewDocRef.current(); return;
           }
           // ── o — Color scheme ──────────────────────────────────────────────
@@ -838,11 +851,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setShowColorScheme(o => !o); return; }
             break;
           }
-          // ── p — Theme customizer / Particles / Prototype ──────────────────
+          // ── p — Theme customizer / Presence / Prototype ──────────────────
+          // ⌘⇧⌥P = Prototype, ⌘⇧P = Cursor Presence, ⌘P = Theme Customizer
           case 'p': {
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowPrototype(v => !v); return; }
-            if (e.shiftKey) { e.preventDefault(); setShowThemeCustomizer(o => !o); return; }
-            break;
+            if (e.shiftKey) { e.preventDefault(); setShowPresencePanel(p => !p); setShowCursorPresence(p => !p); showToast(showCursorPresence ? 'Presence off' : 'Presence mode on', 'info'); return; }
+            e.preventDefault(); setShowThemeCustomizer(o => !o); return;
           }
           // ── q — Clip path editor ──────────────────────────────────────────
           case 'q': {
@@ -1048,6 +1062,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           if (annotationsActive) { setAnnotationsActive(false); return; }
           if (stickyNotesPlacing) { stopStickyNote(); return; }
           if (presentationMode) { setPresentationMode(false); return; }
+          if (focusModeActive) { setFocusModeActive(false); return; }
           drawingRef.current.select(null);
           drawingRef.current.setSelectedIds([]);
           if (activeTool !== 'cursor') setActiveTool('cursor');
@@ -2033,6 +2048,47 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             enabled={showQuickActions}
           />
 
+          {/* Smart Spacing Advisor overlay — gap lines rendered over canvas */}
+          {showSpacingAdvisor && (
+            <SmartSpacingAdvisor
+              shapes={drawing.state.shapes}
+              selectedIds={drawing.state.selectedIds.length > 0 ? drawing.state.selectedIds : (drawing.state.selectedId ? [drawing.state.selectedId] : [])}
+              zoom={viewport.zoom}
+              panX={viewport.panX}
+              panY={viewport.panY}
+              canvasWidth={canvasSize.width}
+              canvasHeight={canvasSize.height}
+              visible={showSpacingAdvisor}
+              onApplyFix={(patches) => {
+                for (const p of patches) {
+                  const { id, ...rest } = p;
+                  drawingRef.current.updateShape(id, rest);
+                }
+                showToast('Spacing fix applied', 'action');
+              }}
+            />
+          )}
+
+          {/* Focus Mode — dims canvas except selected shapes (⌘⇧F) */}
+          <FocusMode
+            shapes={drawing.state.shapes}
+            selectedIds={drawing.state.selectedIds.length > 0 ? drawing.state.selectedIds : (drawing.state.selectedId ? [drawing.state.selectedId] : [])}
+            zoom={viewport.zoom}
+            panX={viewport.panX}
+            panY={viewport.panY}
+            canvasWidth={canvasSize.width}
+            canvasHeight={canvasSize.height}
+            active={focusModeActive}
+            onExit={() => setFocusModeActive(false)}
+          />
+
+          {/* Live Cursor Presence (⌘⇧P) */}
+          <CursorPresence
+            canvasWidth={canvasSize.width}
+            canvasHeight={canvasSize.height}
+            active={showCursorPresence}
+          />
+
           {/* Canvas Status Bar */}
           <CanvasStatusBar
             zoom={viewport.zoom}
@@ -2179,6 +2235,59 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         onStartConnect={(id) => { setProtoConnectingFrom(id); setProtoCanvasCursor(null); }}
         onCancelConnect={() => { setProtoConnectingFrom(null); setProtoCanvasCursor(null); }}
       />
+
+      {/* AI Quick Styles Panel (⌘⇧J) */}
+      {showAIQuickStyles && (
+        <AIQuickSuggestionsPanel
+          shape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+          visible={showAIQuickStyles}
+          onClose={() => setShowAIQuickStyles(false)}
+          onApply={(patch) => {
+            const id = drawing.state.selectedId;
+            if (!id) return;
+            // Map shadow string → shadows array if provided
+            const shapePatch: Partial<Shape> = {};
+            if (patch.fill !== undefined) shapePatch.fill = patch.fill;
+            if (patch.stroke !== undefined) shapePatch.stroke = patch.stroke;
+            if (patch.strokeWidth !== undefined) shapePatch.strokeWidth = patch.strokeWidth;
+            if (patch.opacity !== undefined) shapePatch.opacity = patch.opacity;
+            if (patch.borderRadius !== undefined) shapePatch.borderRadius = patch.borderRadius;
+            if (patch.color !== undefined) shapePatch.color = patch.color;
+            if (patch.blur !== undefined) shapePatch.filterBlur = patch.blur;
+            drawingRef.current.updateShape(id, shapePatch);
+            showToast('Style applied', 'action');
+          }}
+          style={{
+            position: 'fixed',
+            top: 80,
+            right: 300,
+            zIndex: 35,
+          }}
+        />
+      )}
+
+      {/* Focus Mode (⌘⇧F) */}
+      {/* Rendered inside the canvas container via portal-like absolute positioning */}
+
+      {/* Cursor Presence Panel (⌘⇧P) */}
+      {showPresencePanel && (
+        <CursorPresencePanel
+          collaborators={[
+            { id: 'alex', name: 'Alex Chen', avatar: 'AC', color: '#f59e0b', isTyping: false },
+            { id: 'maya', name: 'Maya Patel', avatar: 'MP', color: '#06b6d4', isTyping: false },
+            { id: 'sam', name: 'Sam Rivera', avatar: 'SR', color: '#22c55e', isTyping: false },
+            { id: 'jordan', name: 'Jordan Kim', avatar: 'JK', color: '#f43f5e', isTyping: false },
+          ]}
+          visible={showPresencePanel}
+          onClose={() => { setShowPresencePanel(false); setShowCursorPresence(false); }}
+          style={{
+            position: 'fixed',
+            top: 80,
+            right: showAIQuickStyles ? 560 : 300,
+            zIndex: 35,
+          }}
+        />
+      )}
 
       {/* Keyboard shortcuts overlay */}
       <KeyboardShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
