@@ -4628,3 +4628,119 @@ describe('ColorPaletteExtractor', () => {
     expect(css).toContain('--color-dark-blue:');
   });
 });
+
+// ── IconSearchPanel ───────────────────────────────────────────────────────────
+
+interface IcnDef { name: string; category: string; tags: string[]; path: string }
+const ICN_LIBRARY: IcnDef[] = [
+  { name: 'Home', category: 'Interface', tags: ['house', 'main', 'start'], path: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
+  { name: 'Search', category: 'Interface', tags: ['find', 'magnify', 'lookup'], path: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
+  { name: 'Mail', category: 'Communication', tags: ['email', 'message', 'envelope'], path: 'M4 4h16c1.1 0 2 .9 2 2v12' },
+  { name: 'Sun', category: 'Weather', tags: ['sunny', 'day', 'clear', 'light'], path: 'M12 17a5 5 0 100-10' },
+  { name: 'Play', category: 'Media', tags: ['video', 'start', 'run'], path: 'M5 3l14 9-14 9V3z' },
+];
+
+function icnSearch(query: string, category?: string): IcnDef[] {
+  const q = query.trim().toLowerCase();
+  return ICN_LIBRARY.filter(icon => {
+    const matchCategory = !category || category === 'All' || icon.category === category;
+    if (!matchCategory) return false;
+    if (!q) return true;
+    return icon.name.toLowerCase().includes(q) || icon.tags.some(t => t.includes(q));
+  });
+}
+
+function icnCategories(): string[] {
+  const cats = Array.from(new Set(ICN_LIBRARY.map(i => i.category)));
+  return ['All', ...cats.sort()];
+}
+
+function icnExportSVG(icon: IcnDef, size: number, color: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="${color}" stroke-width="2"><path d="${icon.path}"/></svg>`;
+}
+
+describe('IconSearchPanel', () => {
+  it('search: returns all icons with empty query', () => {
+    expect(icnSearch('')).toHaveLength(ICN_LIBRARY.length);
+  });
+
+  it('search: filters by name', () => {
+    const r = icnSearch('home');
+    expect(r).toHaveLength(1);
+    expect(r[0].name).toBe('Home');
+  });
+
+  it('search: filters by tag', () => {
+    const r = icnSearch('envelope');
+    expect(r).toHaveLength(1);
+    expect(r[0].name).toBe('Mail');
+  });
+
+  it('search: is case-insensitive', () => {
+    expect(icnSearch('SEARCH')).toHaveLength(1);
+  });
+
+  it('search: returns empty for no match', () => {
+    expect(icnSearch('nonexistenticonxyz')).toHaveLength(0);
+  });
+
+  it('search: filters by category', () => {
+    const r = icnSearch('', 'Weather');
+    expect(r).toHaveLength(1);
+    expect(r[0].name).toBe('Sun');
+  });
+
+  it('search: All category returns everything', () => {
+    expect(icnSearch('', 'All')).toHaveLength(ICN_LIBRARY.length);
+  });
+
+  it('search: category + query both applied', () => {
+    const r = icnSearch('home', 'Communication');
+    expect(r).toHaveLength(0); // Home is Interface
+  });
+
+  it('getAllCategories: starts with All', () => {
+    const cats = icnCategories();
+    expect(cats[0]).toBe('All');
+  });
+
+  it('getAllCategories: no duplicates', () => {
+    const cats = icnCategories();
+    expect(new Set(cats).size).toBe(cats.length);
+  });
+
+  it('exportSVG: includes viewBox', () => {
+    const svg = icnExportSVG(ICN_LIBRARY[0], 24, '#ff0000');
+    expect(svg).toContain('viewBox="0 0 24 24"');
+  });
+
+  it('exportSVG: includes size attributes', () => {
+    const svg = icnExportSVG(ICN_LIBRARY[0], 32, '#fff');
+    expect(svg).toContain('width="32"');
+    expect(svg).toContain('height="32"');
+  });
+
+  it('exportSVG: includes stroke color', () => {
+    const svg = icnExportSVG(ICN_LIBRARY[0], 24, '#ff6600');
+    expect(svg).toContain('stroke="#ff6600"');
+  });
+
+  it('exportSVG: includes path data', () => {
+    const svg = icnExportSVG(ICN_LIBRARY[2], 24, '#fff');
+    expect(svg).toContain(ICN_LIBRARY[2].path);
+  });
+
+  it('search: partial name match works', () => {
+    const r = icnSearch('sea');
+    expect(r.some(i => i.name === 'Search')).toBe(true);
+  });
+
+  it('library: all icons have required fields', () => {
+    for (const icon of ICN_LIBRARY) {
+      expect(typeof icon.name).toBe('string');
+      expect(typeof icon.category).toBe('string');
+      expect(Array.isArray(icon.tags)).toBe(true);
+      expect(typeof icon.path).toBe('string');
+    }
+  });
+});

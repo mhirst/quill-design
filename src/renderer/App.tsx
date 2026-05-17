@@ -142,6 +142,8 @@ import { ShapeTimelinePanel } from './components/canvas/ShapeTimelinePanel';
 import { SVGPatternLibrary } from './components/canvas/SVGPatternLibrary';
 import { SpacingTokenInspector } from './components/canvas/SpacingTokenInspector';
 import { ColorPaletteExtractor } from './components/canvas/ColorPaletteExtractor';
+import { IconSearchPanel } from './components/canvas/IconSearchPanel';
+import type { IconDef } from './components/canvas/IconSearchPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -553,6 +555,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showSVGPatterns, setShowSVGPatterns] = useState(false);
   const [showSpacingTokens, setShowSpacingTokens] = useState(false);
   const [showColorPalette, setShowColorPalette] = useState(false);
+  const [showIconSearch, setShowIconSearch] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -911,7 +914,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }
           // ── i — Image fill / Design intel / Micro-interaction ─────────────
           case 'i': {
-            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowDesignIntel(v => !v); return; }
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowIconSearch(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowImageFill(i => !i); return; }
             if (e.altKey) { e.preventDefault(); setShowMicroInteraction(v => !v); return; }
             break;
@@ -3094,6 +3097,21 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         open={showColorPalette}
         onClose={() => setShowColorPalette(false)}
         shapes={drawing.state.shapes}
+      />
+
+      {/* Icon Search & Inserter (⌘⌥⇧I) */}
+      <IconSearchPanel
+        open={showIconSearch}
+        onClose={() => setShowIconSearch(false)}
+        onInsert={(icon: IconDef, color: string, sz: number) => {
+          const shape = defaultShape('rectangle', uuid());
+          shape.name = icon.name;
+          shape.width = sz;
+          shape.height = sz;
+          shape.fill = 'transparent';
+          shape.stroke = color;
+          drawingRef.current.addShape(shape);
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
