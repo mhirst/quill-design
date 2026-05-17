@@ -258,6 +258,9 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename }: Works
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [leftTab, setLeftTab] = useState<LeftTab>('layers');
 
+  // Chat bar — collapse signal: incrementing this tells ChatBar to collapse
+  const [chatCollapseSignal, setChatCollapseSignal] = useState(0);
+
   // Right panel collapse
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
@@ -736,6 +739,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename }: Works
             onPenStartDragPoint={drawing.penStartDragPoint}
             onPenDragPoint={drawing.penDragPoint}
             onPenEndDragPoint={drawing.penEndDragPoint}
+            onCanvasPointerDown={() => setChatCollapseSignal(n => n + 1)}
           />
         </div>
 
@@ -748,6 +752,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename }: Works
           onSend={chat.send}
           onAbort={chat.abort}
           onClearSelection={canvas.clearSelection}
+          collapseSignal={chatCollapseSignal}
         />
       </div>
 

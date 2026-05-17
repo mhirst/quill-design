@@ -1,10 +1,22 @@
 import { useCallback, useRef, useState } from 'react';
 import type { Shape } from '../../lib/shapes';
 import { shapesToJsx, shapesToCanvas } from '../../lib/shapes';
+import { shapesToSvg } from '../../lib/exportSvg';
+import { shapesToHtml } from '../../lib/exportHtml';
 import { analytics } from '../../lib/analytics';
 
 interface Props {
   shapes: Shape[];
+}
+
+function downloadText(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function ExportToolbar({ shapes }: Props) {
@@ -39,6 +51,22 @@ export function ExportToolbar({ shapes }: Props) {
     a.click();
     showToast('Exported!');
     analytics.track('export', { format: 'png', shape_count: shapes.length });
+  }, [shapes, showToast]);
+
+  const exportSvg = useCallback(() => {
+    if (shapes.length === 0) { showToast('No shapes to export'); return; }
+    const svg = shapesToSvg(shapes);
+    downloadText(svg, 'design.svg', 'image/svg+xml');
+    showToast('Exported!');
+    analytics.track('export', { format: 'svg', shape_count: shapes.length });
+  }, [shapes, showToast]);
+
+  const exportHtml = useCallback(() => {
+    if (shapes.length === 0) { showToast('No shapes to export'); return; }
+    const html = shapesToHtml(shapes);
+    downloadText(html, 'design.html', 'text/html');
+    showToast('Exported!');
+    analytics.track('export', { format: 'html', shape_count: shapes.length });
   }, [shapes, showToast]);
 
   return (
@@ -86,6 +114,8 @@ export function ExportToolbar({ shapes }: Props) {
       }}>
         <ExportBtn title="Copy as JSX" onClick={copyAsJsx} label="JSX" />
         <ExportBtn title="Export as PNG" onClick={exportPng} label="PNG" />
+        <ExportBtn title="Export as SVG" onClick={exportSvg} label="SVG" />
+        <ExportBtn title="Export as HTML" onClick={exportHtml} label="HTML" />
       </div>
     </div>
   );

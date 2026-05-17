@@ -1,5 +1,5 @@
 import type { Shape } from '../../lib/shapes';
-import { pathBbox } from '../../lib/shapes';
+import { pathBbox, normalizeRadius } from '../../lib/shapes';
 import type { HandleDir } from '../../hooks/useDrawingTools';
 
 interface Props {
@@ -57,7 +57,7 @@ export function ShapeHandles({ shape, zoom, onResizeStart }: Props) {
           position: 'absolute',
           inset: 0,
           border: `${borderWidth}px solid ${BORDER_COLOR}`,
-          borderRadius: shape.borderRadius > 0 ? Math.min(shape.borderRadius, Math.min(width, height) / 2) : 0,
+          borderRadius: (() => { const [tl] = normalizeRadius(shape.borderRadius); return tl > 0 ? Math.min(tl, Math.min(width, height) / 2) : 0; })(),
           pointerEvents: 'none',
           boxSizing: 'border-box',
         }}

@@ -2,10 +2,20 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Sparkles, Send, Square, ChevronDown, X } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { cn, stripJsxBlock } from '../../lib/utils';
+import { usePromptHistory } from '../../hooks/usePromptHistory';
 import type { ChatMessage as ChatMessageType, ElementSelection } from '@shared/types';
 
 const EXPANDED_HEIGHT = 340;
 const COLLAPSED_HEIGHT = 52;
+
+const SUGGESTIONS = [
+  'A pricing card with 3 tiers',
+  'A login form with email & password',
+  'A dashboard stat card',
+  'A hero section with a CTA button',
+  'A navigation bar with logo and links',
+  'A product card with image and price',
+];
 
 interface Props {
   messages: ChatMessageType[];
@@ -16,6 +26,8 @@ interface Props {
   onSend: (text: string) => void;
   onAbort: () => void;
   onClearSelection: () => void;
+  /** Increments each time the canvas is clicked — ChatBar collapses when this fires (unless streaming) */
+  collapseSignal?: number;
 }
 
 export function ChatBar({
@@ -27,12 +39,26 @@ export function ChatBar({
   onSend,
   onAbort,
   onClearSelection,
+  collapseSignal,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRowRef = useRef<HTMLDivElement>(null);
+
+  // Prompt history navigation
+  const promptHistory = usePromptHistory();
+  const [historyIndex, setHistoryIndex] = useState(-1); // -1 = not navigating
+
+  // Auto-collapse when canvas is clicked (unless streaming)
+  useEffect(() => {
+    if (collapseSignal && collapseSignal > 0 && !isStreaming) {
+      setExpanded(false);
+      setHistoryIndex(-1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseSignal]);
 
   // Auto-expand when streaming starts
   useEffect(() => {
@@ -56,6 +82,8 @@ export function ChatBar({
   const handleSend = () => {
     const text = value.trim();
     if (!text || isStreaming) return;
+    promptHistory.push(text);
+    setHistoryIndex(-1);
     onSend(text);
     setValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -65,8 +93,49 @@ export function ChatBar({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+      return;
     }
-    if (e.key === 'Escape') setExpanded(false);
+
+    if (e.key === 'Escape') {
+      setExpanded(false);
+      setHistoryIndex(-1);
+      return;
+    }
+
+    // Prompt history navigation — only when cursor is at the start/end of input
+    if (e.key === 'ArrowUp' && !isStreaming) {
+      const history = promptHistory.getAll();
+      if (history.length === 0) return;
+      e.preventDefault();
+      const next = Math.min(historyIndex + 1, history.length - 1);
+      setHistoryIndex(next);
+      setValue(history[next]);
+      // Move cursor to end after state update
+      setTimeout(() => {
+        const el = textareaRef.current;
+        if (el) { el.selectionStart = el.selectionEnd = el.value.length; }
+      }, 0);
+      return;
+    }
+
+    if (e.key === 'ArrowDown' && !isStreaming && historyIndex >= 0) {
+      e.preventDefault();
+      const history = promptHistory.getAll();
+      const next = historyIndex - 1;
+      if (next < 0) {
+        setHistoryIndex(-1);
+        setValue('');
+      } else {
+        setHistoryIndex(next);
+        setValue(history[next]);
+      }
+      return;
+    }
+
+    // If user edits while navigating history, exit history mode
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      setHistoryIndex(-1);
+    }
   };
 
   const handleInput = () => {
@@ -81,6 +150,8 @@ export function ChatBar({
   const snippetText = isStreaming
     ? 'Generating component…'
     : (stripJsxBlock(lastAssistantMsg?.content ?? '').trim().slice(0, 80) || (lastAssistantMsg ? 'Component ready' : ''));
+
+  const showSuggestions = expanded && value === '' && messages.length === 0;
 
   return (
     <div
@@ -98,29 +169,11 @@ export function ChatBar({
           className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2 min-h-0"
         >
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
               <Sparkles size={18} style={{ color: 'var(--muted)' }} />
               <p style={{ fontSize: 14, color: 'var(--muted)' }}>
                 Describe a component to generate it
               </p>
-              <div className="flex flex-col gap-1.5 w-full max-w-sm mt-1">
-                {['A pricing card with 3 tiers', 'A login form', 'A dashboard stat card'].map((ex) => (
-                  <button
-                    key={ex}
-                    onClick={() => onSend(ex)}
-                    className="text-left px-3 py-2 rounded-lg transition-colors text-sm"
-                    style={{
-                      background: 'var(--panel-alt)',
-                      color: 'var(--muted)',
-                      border: '1px solid var(--border)',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
-                  >
-                    {ex}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 
@@ -148,13 +201,53 @@ export function ChatBar({
         </div>
       )}
 
+      {/* ── Suggestion chips (above input, when empty and expanded) ── */}
+      {showSuggestions && (
+        <div
+          className="flex flex-wrap gap-1.5 px-3 pb-2 flex-shrink-0"
+          style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}
+        >
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => {
+                setValue(s);
+                setHistoryIndex(-1);
+                setTimeout(() => textareaRef.current?.focus(), 0);
+              }}
+              style={{
+                fontSize: 11,
+                padding: '3px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                background: 'var(--panel-alt)',
+                color: 'var(--muted)',
+                cursor: 'pointer',
+                transition: 'color 0.1s, border-color 0.1s',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--text)';
+                e.currentTarget.style.borderColor = 'var(--accent)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--muted)';
+                e.currentTarget.style.borderColor = 'var(--border)';
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Input row (always visible) ── */}
       <div
         ref={inputRowRef}
         className="flex items-center gap-2 px-3 flex-shrink-0"
         style={{
           height: COLLAPSED_HEIGHT,
-          borderTop: expanded ? '1px solid var(--border)' : 'none',
+          borderTop: expanded && !showSuggestions ? '1px solid var(--border)' : 'none',
         }}
       >
         {/* Sparkle icon */}
@@ -211,9 +304,10 @@ export function ChatBar({
               onInput={handleInput}
               rows={1}
               placeholder={
+                historyIndex >= 0 ? 'Browsing history — ↑↓ to navigate, Enter to send' :
                 selection ? `Edit ${selection.descriptor}…` :
                 selectedShape?.type === 'frame' ? `Design inside "${selectedShape.name}"…` :
-                'Design with Quill… (creates a new frame)'
+                'Describe a component… (↑ for history)'
               }
               className="w-full resize-none bg-transparent outline-none text-sm leading-relaxed"
               style={{
@@ -238,12 +332,12 @@ export function ChatBar({
         {/* Collapse button (only when expanded) */}
         {expanded && (
           <button
-            onClick={() => setExpanded(false)}
+            onClick={() => { setExpanded(false); setHistoryIndex(-1); }}
             className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors"
             style={{ color: 'var(--muted)' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
-            title="Collapse chat"
+            title="Collapse chat (Esc)"
             aria-label="Collapse chat"
           >
             <ChevronDown size={14} />

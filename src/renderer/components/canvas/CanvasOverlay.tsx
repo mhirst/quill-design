@@ -55,6 +55,8 @@ interface Props {
   onPenStartDragPoint?: (index: number) => void;
   onPenDragPoint?: (x: number, y: number) => void;
   onPenEndDragPoint?: () => void;
+  /** Fires on any pointer-down on the canvas surface — used to auto-collapse the chat bar */
+  onCanvasPointerDown?: () => void;
 }
 
 function toolCursor(tool: Tool, isPanning: boolean): string {
@@ -155,6 +157,7 @@ export function CanvasOverlay({
   onPenStartDragPoint,
   onPenDragPoint,
   onPenEndDragPoint,
+  onCanvasPointerDown,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -479,6 +482,9 @@ export function CanvasOverlay({
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
 
+      // Notify parent of any canvas interaction (used to auto-collapse chat bar)
+      onCanvasPointerDown?.();
+
       // Space+drag or pan tool = pan
       if (spaceDownRef.current || activeTool === 'pan') {
         panningRef.current = true;
@@ -513,7 +519,7 @@ export function CanvasOverlay({
       // Start marquee selection drag
       dragRef.current = { type: 'marquee', originX: x, originY: y };
     },
-    [activeTool, screenToCanvas, onDrawStart, onSelect, onPenClick, onPenCommit] // pan removed — read from panRef
+    [activeTool, screenToCanvas, onDrawStart, onSelect, onPenClick, onPenCommit, onCanvasPointerDown] // pan removed — read from panRef
   );
 
   const handleShapeContextMenu = useCallback(

@@ -31,7 +31,8 @@ export interface Shape {
   fillOpacity: number;
   stroke: string;
   strokeWidth: number;
-  borderRadius: number;
+  /** Uniform radius (number) or per-corner [TL, TR, BR, BL] tuple. 9999 = circle (ellipse). */
+  borderRadius: number | [number, number, number, number];
   opacity: number;
   // Effects
   shadow: boolean;
@@ -199,6 +200,34 @@ function pathToSvgJsx(s: Shape): string {
       </svg>`;
 }
 
+/**
+ * Normalise borderRadius to a 4-tuple [TL, TR, BR, BL].
+ * Handles both the legacy scalar form and the new per-corner tuple.
+ */
+export function normalizeRadius(r: Shape['borderRadius']): [number, number, number, number] {
+  if (Array.isArray(r)) return r;
+  return [r, r, r, r];
+}
+
+/**
+ * Convert borderRadius to a CSS string.
+ * - 9999 (scalar) → '50%' (circle)
+ * - uniform n → 'npx'
+ * - per-corner tuple → 'TLpx TRpx BRpx BLpx'
+ */
+export function radiusToCss(r: Shape['borderRadius']): string {
+  if (!Array.isArray(r)) {
+    if (r === 9999) return '50%';
+    return r > 0 ? `${r}px` : '0';
+  }
+  const [tl, tr, br, bl] = r;
+  // Collapse back to a single value if all equal (cleaner output)
+  if (tl === tr && tr === br && br === bl) {
+    return tl > 0 ? `${tl}px` : '0';
+  }
+  return `${tl}px ${tr}px ${br}px ${bl}px`;
+}
+
 export function buildShapeStyle(s: Shape): React.CSSProperties {
   const style: Record<string, string | number> = {
     position: 'absolute',
@@ -229,8 +258,9 @@ export function buildShapeStyle(s: Shape): React.CSSProperties {
     if (s.type === 'frame') style.border = `${s.strokeWidth}px dashed ${s.stroke}`;
   }
 
-  if (s.borderRadius > 0) {
-    style.borderRadius = s.borderRadius === 9999 ? '50%' : `${s.borderRadius}px`;
+  const radiusCss = radiusToCss(s.borderRadius);
+  if (radiusCss !== '0') {
+    style.borderRadius = radiusCss;
   }
 
   if (s.shadow) {
@@ -523,25 +553,31 @@ export function shapesToCanvas(shapes: Shape[], canvas: HTMLCanvasElement): void
       ctx.shadowColor = s.shadowColor;
     }
 
-    const isEllipse = s.borderRadius >= 9999;
+    const [rTL_raw, rTR_raw, rBR_raw, rBL_raw] = normalizeRadius(s.borderRadius);
+    const isEllipse = !Array.isArray(s.borderRadius) && s.borderRadius >= 9999;
 
     // Build fill path
     if (isEllipse) {
       ctx.beginPath();
       ctx.ellipse(sx + s.width / 2, sy + s.height / 2, s.width / 2, s.height / 2, 0, 0, Math.PI * 2);
     } else {
-      const r = Math.min(s.borderRadius, Math.min(s.width, s.height) / 2);
-      if (r > 0) {
+      const maxR = Math.min(s.width, s.height) / 2;
+      const rTL = Math.min(rTL_raw, maxR);
+      const rTR = Math.min(rTR_raw, maxR);
+      const rBR = Math.min(rBR_raw, maxR);
+      const rBL = Math.min(rBL_raw, maxR);
+      const hasRadius = rTL > 0 || rTR > 0 || rBR > 0 || rBL > 0;
+      if (hasRadius) {
         ctx.beginPath();
-        ctx.moveTo(sx + r, sy);
-        ctx.lineTo(sx + s.width - r, sy);
-        ctx.quadraticCurveTo(sx + s.width, sy, sx + s.width, sy + r);
-        ctx.lineTo(sx + s.width, sy + s.height - r);
-        ctx.quadraticCurveTo(sx + s.width, sy + s.height, sx + s.width - r, sy + s.height);
-        ctx.lineTo(sx + r, sy + s.height);
-        ctx.quadraticCurveTo(sx, sy + s.height, sx, sy + s.height - r);
-        ctx.lineTo(sx, sy + r);
-        ctx.quadraticCurveTo(sx, sy, sx + r, sy);
+        ctx.moveTo(sx + rTL, sy);
+        ctx.lineTo(sx + s.width - rTR, sy);
+        ctx.quadraticCurveTo(sx + s.width, sy, sx + s.width, sy + rTR);
+        ctx.lineTo(sx + s.width, sy + s.height - rBR);
+        ctx.quadraticCurveTo(sx + s.width, sy + s.height, sx + s.width - rBR, sy + s.height);
+        ctx.lineTo(sx + rBL, sy + s.height);
+        ctx.quadraticCurveTo(sx, sy + s.height, sx, sy + s.height - rBL);
+        ctx.lineTo(sx, sy + rTL);
+        ctx.quadraticCurveTo(sx, sy, sx + rTL, sy);
         ctx.closePath();
       } else {
         ctx.beginPath();

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, type ReactNode, type CSSProperties } from 'react';
 import type { Shape } from '../../lib/shapes';
+import { normalizeRadius } from '../../lib/shapes';
 import { GOOGLE_FONTS, SYSTEM_FONTS, CATEGORY_LABELS, type GoogleFont } from '../../lib/googleFonts';
 import { loadGoogleFont } from '../../hooks/useFontLoader';
 
@@ -1238,27 +1239,38 @@ function CornerRadiusRow({ shape, onPreview, onChange }: {
   onPreview: (patch: Partial<Shape>) => void;
   onChange: (patch: Partial<Shape>) => void;
 }) {
-  const [perCorner, setPerCorner] = useState(false);
+  // Derive per-corner mode from the stored value: if it's a tuple with unequal values, use per-corner mode
+  const [tl, tr, br, bl] = normalizeRadius(shape.borderRadius);
+  const isUniform = tl === tr && tr === br && br === bl;
+  const perCorner = Array.isArray(shape.borderRadius) && !isUniform;
 
-  // Per-corner values (stored locally — shape only has a single borderRadius)
-  const r = shape.borderRadius;
-  const [tl, setTl] = useState(r);
-  const [tr, setTr] = useState(r);
-  const [bl, setBl] = useState(r);
-  const [br, setBr] = useState(r);
+  const uniformValue = isUniform ? tl : Math.max(tl, tr, br, bl);
 
-  // Sync uniform value into per-corner when switching modes
-  useEffect(() => {
-    if (!perCorner) { setTl(r); setTr(r); setBl(r); setBr(r); }
-  }, [r, perCorner]);
+  const corners: [string, number, number][] = [
+    ['TL', tl, 0],
+    ['TR', tr, 1],
+    ['BR', br, 2],
+    ['BL', bl, 3],
+  ];
 
-  const commitPerCorner = (vals: [number, number, number, number]) => {
-    // Pack into a single value: we use tl as the canonical value for now
-    // but encode all four in borderRadius as the max (Figma-style: use max if mixed)
-    const [ntl, ntr, nbl, nbr] = vals;
-    const max = Math.max(ntl, ntr, nbl, nbr);
-    onPreview({ borderRadius: max });
-    onChange({ borderRadius: max });
+  const handleCornerChange = (cornerIndex: number, v: number) => {
+    const next: [number, number, number, number] = [tl, tr, br, bl];
+    next[cornerIndex] = v;
+    // If all equal after this change, collapse back to scalar
+    const [a, b, c, d] = next;
+    const allEqual = a === b && b === c && c === d;
+    onPreview({ borderRadius: allEqual ? a : next });
+    onChange({ borderRadius: allEqual ? a : next });
+  };
+
+  const handleTogglePerCorner = () => {
+    if (perCorner) {
+      // Collapse to uniform (use max of current values)
+      onChange({ borderRadius: uniformValue });
+    } else {
+      // Expand to per-corner (all same as current uniform)
+      onChange({ borderRadius: [uniformValue, uniformValue, uniformValue, uniformValue] });
+    }
   };
 
   if (perCorner) {
@@ -1267,8 +1279,8 @@ function CornerRadiusRow({ shape, onPreview, onChange }: {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <span style={labelSt}>Corner radius</span>
           <button
-            onClick={() => setPerCorner(false)}
-            title="Uniform radius"
+            onClick={handleTogglePerCorner}
+            title="Switch to uniform radius"
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--accent)', display: 'flex' }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -1280,18 +1292,9 @@ function CornerRadiusRow({ shape, onPreview, onChange }: {
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          {([['TL', tl, setTl], ['TR', tr, setTr], ['BL', bl, setBl], ['BR', br, setBr]] as const).map(([lbl, val, setVal]) => (
-            <CornerInput key={lbl} label={lbl} value={val as number}
-              onChange={(v) => {
-                (setVal as (n: number) => void)(v);
-                const next: [number, number, number, number] = [
-                  lbl === 'TL' ? v : tl,
-                  lbl === 'TR' ? v : tr,
-                  lbl === 'BL' ? v : bl,
-                  lbl === 'BR' ? v : br,
-                ];
-                commitPerCorner(next);
-              }}
+          {corners.map(([lbl, val, idx]) => (
+            <CornerInput key={lbl} label={lbl} value={val}
+              onChange={(v) => handleCornerChange(idx, v)}
             />
           ))}
         </div>
@@ -1304,14 +1307,14 @@ function CornerRadiusRow({ shape, onPreview, onChange }: {
       <div style={{ flex: 1 }}>
         <FieldBox
           label="Corner radius"
-          value={shape.borderRadius}
+          value={uniformValue}
           min={0}
           onPreview={(v) => onPreview({ borderRadius: v })}
           onCommit={(v) => onChange({ borderRadius: v })}
         />
       </div>
       <button
-        onClick={() => setPerCorner(true)}
+        onClick={handleTogglePerCorner}
         title="Set each corner individually"
         style={{
           width: 28, height: 28, flexShrink: 0, marginBottom: 1,
