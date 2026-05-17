@@ -95,6 +95,8 @@ import { SmartSpacingAdvisor } from './components/canvas/SmartSpacingAdvisor';
 import { AIQuickSuggestionsPanel } from './components/canvas/AIQuickSuggestionsPanel';
 import { FocusMode } from './components/canvas/FocusMode';
 import { CursorPresence, CursorPresencePanel } from './components/canvas/CursorPresence';
+import { GradientEditorPanel } from './components/canvas/GradientEditorPanel';
+import { KeyframeTimeline } from './components/canvas/KeyframeTimeline';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -459,6 +461,8 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [focusModeActive, setFocusModeActive] = useState(false);
   const [showCursorPresence, setShowCursorPresence] = useState(false);
   const [showPresencePanel, setShowPresencePanel] = useState(false);
+  const [showGradientEditor, setShowGradientEditor] = useState(false);
+  const [showKeyframeTimeline, setShowKeyframeTimeline] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -791,11 +795,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { e.preventDefault(); setFocusModeActive(f => !f); showToast(focusModeActive ? 'Focus mode off' : 'Focus mode on', 'info'); return; }
             e.preventDefault(); setShowSpotlight(o => !o); return;
           }
-          // ── g — Group / Ungroup / Generative art / Wrap in frame ──────────
+          // ── g — Group / Ungroup / Generative art / Gradient editor ────────
+          // ⌘⇧⌥G = Gradient Editor, ⌘⌥G = Generative Art, ⌘⇧G = Ungroup, ⌘G = Group
           case 'g': {
             e.preventDefault();
-            if (e.shiftKey && e.altKey) { setShowGenerativeArt(v => !v); return; }
-            if (e.altKey) { drawingRef.current.wrapInFrame(); return; }
+            if (e.shiftKey && e.altKey) { setShowGradientEditor(v => !v); return; }
+            if (e.altKey) { setShowGenerativeArt(v => !v); return; }
             if (e.shiftKey) { drawingRef.current.ungroup(); return; }
             drawingRef.current.group(); return;
           }
@@ -876,11 +881,13 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey) { handleSaveAsRef.current(); return; }
             handleSaveRef.current(); return;
           }
-          // ── t — Type scale / Template gallery / Tidy up / Text styles ─────
+          // ── t — Type scale / Template / Tidy up / Keyframe Timeline ───────
+          // ⌘⇧⌥T = Keyframe Timeline, ⌘⌥T = Tidy Up, ⌘⇧T = Type Scale
           case 't': {
-            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowTemplateGallery(v => !v); return; }
+            if (e.shiftKey && e.altKey) { e.preventDefault(); setShowKeyframeTimeline(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowTypeScale(o => !o); return; }
             if (e.altKey) { e.preventDefault(); drawingRef.current.tidyUp(); showToast('Tidy up', 'action'); return; }
+            if (!e.shiftKey && !e.altKey) { e.preventDefault(); setShowTemplateGallery(v => !v); return; }
             break;
           }
           // ── u — UI blocks ─────────────────────────────────────────────────
@@ -2288,6 +2295,46 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
           }}
         />
       )}
+
+      {/* Gradient Editor Panel (⌘⇧⌥G) */}
+      <GradientEditorPanel
+        open={showGradientEditor}
+        onClose={() => setShowGradientEditor(false)}
+        shape={drawing.state.shapes.find(s => s.id === drawing.state.selectedId) ?? null}
+        onApply={(css, stops, type, angle) => {
+          const id = drawing.state.selectedId;
+          if (!id) return;
+          // Map to shape gradient properties
+          const sortedStops = [...stops].sort((a, b) => a.position - b.position);
+          const gradFillType = type === 'radial' ? 'radial-gradient' : 'linear-gradient';
+          drawingRef.current.updateShape(id, {
+            fillType: gradFillType as 'linear-gradient' | 'radial-gradient',
+            gradientStops: sortedStops.map(s => ({ color: s.color, position: s.position / 100 })),
+            gradientAngle: angle,
+          });
+          showToast('Gradient applied', 'action');
+        }}
+      />
+
+      {/* Keyframe Timeline (⌘⇧⌥T) */}
+      <KeyframeTimeline
+        open={showKeyframeTimeline}
+        onClose={() => setShowKeyframeTimeline(false)}
+        shapeName={drawing.state.shapes.find(s => s.id === drawing.state.selectedId)?.name}
+        onExportCSS={(css) => {
+          const blob = new Blob([css], { type: 'text/css' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'animation.css';
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('CSS exported', 'action');
+        }}
+        onPreview={(animName, duration, delay, iterations) => {
+          showToast(`Preview: ${animName} ${duration}ms`, 'info');
+        }}
+      />
 
       {/* Keyboard shortcuts overlay */}
       <KeyboardShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
