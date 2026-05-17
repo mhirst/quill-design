@@ -136,6 +136,7 @@ import { AttentionHeatmapPanel } from './components/canvas/AttentionHeatmapPanel
 import { MultiPagePanel } from './components/canvas/MultiPagePanel';
 import { VariableFontExplorerPanel } from './components/canvas/VariableFontExplorerPanel';
 import { BlendModesPanel } from './components/canvas/BlendModesPanel';
+import { SnapGuideManagerPanel } from './components/canvas/SnapGuideManagerPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -541,6 +542,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showMultiPage, setShowMultiPage] = useState(false);
   const [showVarFontExplorer, setShowVarFontExplorer] = useState(false);
   const [showBlendModes, setShowBlendModes] = useState(false);
+  const [showSnapGuideManager, setShowSnapGuideManager] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1046,7 +1048,8 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowVariants(v => !v); return; }
             if (e.altKey) { e.preventDefault(); setShowSpacingHeatmap(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowShadowStudio(s => !s); return; }
-            break;
+            // ⌘W = Snap Guide Manager
+            e.preventDefault(); setShowSnapGuideManager(v => !v); return;
           }
           // ── x — Accessibility ─────────────────────────────────────────────
           case 'x': {
@@ -3016,6 +3019,14 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             showToast('Blend mode applied', 'action');
           }
         }}
+      />
+
+      {/* Snap Guide Manager (⌘W) */}
+      <SnapGuideManagerPanel
+        open={showSnapGuideManager}
+        onClose={() => setShowSnapGuideManager(false)}
+        canvasWidth={1440}
+        canvasHeight={900}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}

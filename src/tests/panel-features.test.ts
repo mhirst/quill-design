@@ -3657,3 +3657,220 @@ describe('BlendModesPanel utilities', () => {
     expect(bmOverlayChannel(0.5, 0.75)).toBeCloseTo(1 - 2 * 0.5 * 0.25);
   });
 });
+
+// ── SnapGuideManagerPanel ──────────────────────────────────────────────────────
+
+// Inlined utilities from SnapGuideManagerPanel.tsx
+
+type SGAxis = 'horizontal' | 'vertical';
+interface SG { id: string; axis: SGAxis; position: number; name: string; color: string; locked: boolean; visible: boolean; groupId: string | null; }
+
+function sgGuideId(): string { return 'g-' + Math.random().toString(36).slice(2, 8); }
+
+function sgCreateGuide(axis: SGAxis, position: number, name?: string, color = '#3b82f6', groupId: string | null = null): SG {
+  return { id: sgGuideId(), axis, position, name: name ?? (axis === 'horizontal' ? `H ${Math.round(position)}` : `V ${Math.round(position)}`), color, locked: false, visible: true, groupId };
+}
+
+function sgGenerateColumnGuides(canvasWidth: number, columns: number, gutter: number, margin: number, color = '#ef4444', groupId: string | null = null): SG[] {
+  if (columns < 1) return [];
+  const totalGutters = (columns - 1) * gutter;
+  const usableWidth = canvasWidth - 2 * margin - totalGutters;
+  const colWidth = usableWidth / columns;
+  const guides: SG[] = [];
+  for (let i = 0; i <= columns; i++) {
+    const x = margin + i * (colWidth + gutter);
+    if (i < columns) {
+      guides.push(sgCreateGuide('vertical', x, `Col ${i+1} left`, color, groupId));
+      guides.push(sgCreateGuide('vertical', x + colWidth, `Col ${i+1} right`, color, groupId));
+    }
+  }
+  const seen = new Set<number>();
+  return guides.filter(g => { const key = Math.round(g.position * 100); if (seen.has(key)) return false; seen.add(key); return true; });
+}
+
+function sgGenerateBaselineGuides(canvasHeight: number, baselineHeight: number, offset = 0, color = '#10b981', groupId: string | null = null): SG[] {
+  if (baselineHeight < 1) return [];
+  const guides: SG[] = [];
+  let y = offset; let i = 0;
+  while (y <= canvasHeight) { guides.push(sgCreateGuide('horizontal', y, `Row ${i+1}`, color, groupId)); y += baselineHeight; i++; }
+  return guides;
+}
+
+function sgGenerateSpacingGuides(canvasWidth: number, step: number, color = '#8b5cf6', groupId: string | null = null): SG[] {
+  if (step < 1) return [];
+  const guides: SG[] = [];
+  let x = step;
+  while (x < canvasWidth) { guides.push(sgCreateGuide('vertical', x, `${x}px`, color, groupId)); x += step; }
+  return guides;
+}
+
+function sgToggleLock(guides: SG[], id: string): SG[] { return guides.map(g => g.id === id ? { ...g, locked: !g.locked } : g); }
+function sgToggleVisible(guides: SG[], id: string): SG[] { return guides.map(g => g.id === id ? { ...g, visible: !g.visible } : g); }
+function sgDeleteGuide(guides: SG[], id: string): SG[] { return guides.filter(g => !(g.id === id && !g.locked)); }
+function sgClearUnlocked(guides: SG[]): SG[] { return guides.filter(g => g.locked); }
+function sgSetGroupVisible(guides: SG[], groupId: string, visible: boolean): SG[] { return guides.map(g => g.groupId === groupId ? { ...g, visible } : g); }
+
+function sgSortGuides(guides: SG[]): SG[] {
+  return [...guides].sort((a, b) => { if (a.axis !== b.axis) return a.axis === 'horizontal' ? -1 : 1; return a.position - b.position; });
+}
+
+function sgCountByAxis(guides: SG[]): { horizontal: number; vertical: number } {
+  let h = 0; let v = 0;
+  for (const g of guides) { if (g.axis === 'horizontal') h++; else v++; }
+  return { horizontal: h, vertical: v };
+}
+
+function sgExportJSON(guides: SG[], groups: { id: string; name: string }[]): string {
+  return JSON.stringify({ guides, groups }, null, 2);
+}
+
+function sgImportJSON(json: string): { guides: SG[]; groups: { id: string; name: string }[] } | null {
+  try { const p = JSON.parse(json); if (!Array.isArray(p.guides)) return null; return { guides: p.guides, groups: p.groups ?? [] }; }
+  catch { return null; }
+}
+
+describe('SnapGuideManagerPanel utilities', () => {
+  // createGuide
+  it('createGuide: auto-names vertical guide with V prefix', () => {
+    const g = sgCreateGuide('vertical', 200);
+    expect(g.name).toContain('V');
+    expect(g.name).toContain('200');
+  });
+
+  it('createGuide: auto-names horizontal guide with H prefix', () => {
+    const g = sgCreateGuide('horizontal', 100);
+    expect(g.name).toContain('H');
+  });
+
+  it('createGuide: accepts custom name', () => {
+    const g = sgCreateGuide('vertical', 50, 'My Guide');
+    expect(g.name).toBe('My Guide');
+  });
+
+  it('createGuide: defaults to visible and unlocked', () => {
+    const g = sgCreateGuide('vertical', 100);
+    expect(g.visible).toBe(true);
+    expect(g.locked).toBe(false);
+  });
+
+  // generateColumnGuides
+  it('generateColumnGuides: 4 columns gutter=0 produces 5 unique vertical positions', () => {
+    // With gutter=0, right of col N == left of col N+1 → dedup to N+1 positions
+    const guides = sgGenerateColumnGuides(1000, 4, 0, 0);
+    expect(guides.length).toBe(5);
+    expect(guides.every(g => g.axis === 'vertical')).toBe(true);
+  });
+
+  it('generateColumnGuides: 0 columns returns empty', () => {
+    expect(sgGenerateColumnGuides(1440, 0, 24, 80)).toHaveLength(0);
+  });
+
+  it('generateColumnGuides: first guide at margin position', () => {
+    const guides = sgGenerateColumnGuides(1000, 4, 0, 50);
+    expect(guides[0].position).toBeCloseTo(50);
+  });
+
+  // generateBaselineGuides
+  it('generateBaselineGuides: generates correct number of rows', () => {
+    const guides = sgGenerateBaselineGuides(100, 8);
+    // positions: 0, 8, 16, ... up to 100 → 13 guides (0..96)
+    expect(guides.length).toBeGreaterThan(0);
+    expect(guides.every(g => g.axis === 'horizontal')).toBe(true);
+  });
+
+  it('generateBaselineGuides: step < 1 returns empty', () => {
+    expect(sgGenerateBaselineGuides(200, 0)).toHaveLength(0);
+  });
+
+  // generateSpacingGuides
+  it('generateSpacingGuides: generates guides at step intervals', () => {
+    const guides = sgGenerateSpacingGuides(100, 10);
+    // x = 10, 20, ..., 90 → 9 guides
+    expect(guides).toHaveLength(9);
+  });
+
+  it('generateSpacingGuides: step < 1 returns empty', () => {
+    expect(sgGenerateSpacingGuides(200, 0)).toHaveLength(0);
+  });
+
+  // toggleLock
+  it('toggleLock: unlocked → locked', () => {
+    const g = sgCreateGuide('vertical', 100);
+    const result = sgToggleLock([g], g.id);
+    expect(result[0].locked).toBe(true);
+  });
+
+  it('toggleLock: locked → unlocked', () => {
+    const g = { ...sgCreateGuide('vertical', 100), locked: true };
+    const result = sgToggleLock([g], g.id);
+    expect(result[0].locked).toBe(false);
+  });
+
+  // toggleVisible
+  it('toggleVisible: visible → hidden', () => {
+    const g = sgCreateGuide('vertical', 100);
+    const result = sgToggleVisible([g], g.id);
+    expect(result[0].visible).toBe(false);
+  });
+
+  // deleteGuide
+  it('deleteGuide: removes unlocked guide', () => {
+    const g = sgCreateGuide('vertical', 100);
+    const result = sgDeleteGuide([g], g.id);
+    expect(result).toHaveLength(0);
+  });
+
+  it('deleteGuide: preserves locked guide', () => {
+    const g = { ...sgCreateGuide('vertical', 100), locked: true };
+    const result = sgDeleteGuide([g], g.id);
+    expect(result).toHaveLength(1);
+  });
+
+  // clearUnlocked
+  it('clearUnlocked: removes all unlocked, keeps locked', () => {
+    const locked = { ...sgCreateGuide('vertical', 10), locked: true };
+    const unlocked = sgCreateGuide('vertical', 20);
+    const result = sgClearUnlocked([locked, unlocked]);
+    expect(result).toHaveLength(1);
+    expect(result[0].locked).toBe(true);
+  });
+
+  // sortGuides
+  it('sortGuides: horizontal before vertical', () => {
+    const v = sgCreateGuide('vertical', 50);
+    const h = sgCreateGuide('horizontal', 100);
+    const result = sgSortGuides([v, h]);
+    expect(result[0].axis).toBe('horizontal');
+  });
+
+  it('sortGuides: sorts by position ascending within axis', () => {
+    const a = sgCreateGuide('vertical', 200);
+    const b = sgCreateGuide('vertical', 50);
+    const result = sgSortGuides([a, b]);
+    expect(result[0].position).toBe(50);
+  });
+
+  // countByAxis
+  it('countByAxis: counts correctly', () => {
+    const guides = [sgCreateGuide('horizontal', 10), sgCreateGuide('vertical', 20), sgCreateGuide('vertical', 30)];
+    const { horizontal, vertical } = sgCountByAxis(guides);
+    expect(horizontal).toBe(1);
+    expect(vertical).toBe(2);
+  });
+
+  // export/import
+  it('exportJSON/importJSON: round trips correctly', () => {
+    const g = sgCreateGuide('vertical', 100, 'Test');
+    const json = sgExportJSON([g], []);
+    const parsed = sgImportJSON(json);
+    expect(parsed?.guides[0].name).toBe('Test');
+  });
+
+  it('importJSON: returns null for invalid JSON', () => {
+    expect(sgImportJSON('not json')).toBeNull();
+  });
+
+  it('importJSON: returns null when guides is not an array', () => {
+    expect(sgImportJSON('{"guides": "bad"}')).toBeNull();
+  });
+});
