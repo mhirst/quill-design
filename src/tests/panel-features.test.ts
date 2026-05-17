@@ -3150,3 +3150,203 @@ describe('AttentionHeatmapPanel utilities', () => {
     }
   });
 });
+
+// ── MultiPagePanel ─────────────────────────────────────────────────────────────
+
+// Inlined utility implementations matching MultiPagePanel.tsx
+
+interface TestPageShape2 { id: string; type: string; x: number; y: number; width: number; height: number; }
+interface TestPageDef { id: string; name: string; shapes: TestPageShape2[]; createdAt: number; updatedAt: number; }
+
+function mpPageId(): string {
+  return 'page-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+}
+
+function mpCreatePage(name: string): TestPageDef {
+  const now = Date.now();
+  return { id: mpPageId(), name, shapes: [], createdAt: now, updatedAt: now };
+}
+
+function mpRenamePage(pages: TestPageDef[], id: string, newName: string): TestPageDef[] {
+  return pages.map(p => p.id === id ? { ...p, name: newName, updatedAt: Date.now() } : p);
+}
+
+function mpDuplicatePage(page: TestPageDef, newName?: string): TestPageDef {
+  const now = Date.now();
+  return { ...page, id: mpPageId(), name: newName ?? `${page.name} (copy)`, shapes: page.shapes.map(s => ({ ...s })), createdAt: now, updatedAt: now };
+}
+
+function mpMovePage(pages: TestPageDef[], id: string, direction: 'left' | 'right'): TestPageDef[] {
+  const idx = pages.findIndex(p => p.id === id);
+  if (idx === -1) return pages;
+  const newPages = [...pages];
+  if (direction === 'left' && idx > 0) { [newPages[idx], newPages[idx - 1]] = [newPages[idx - 1], newPages[idx]]; }
+  else if (direction === 'right' && idx < pages.length - 1) { [newPages[idx], newPages[idx + 1]] = [newPages[idx + 1], newPages[idx]]; }
+  return newPages;
+}
+
+function mpDeletePage(pages: TestPageDef[], id: string, activeId: string): { pages: TestPageDef[]; newActiveId: string } {
+  if (pages.length <= 1) return { pages, newActiveId: activeId };
+  const idx = pages.findIndex(p => p.id === id);
+  const filtered = pages.filter(p => p.id !== id);
+  const newActiveIdx = Math.min(idx, filtered.length - 1);
+  const newActiveId = id === activeId ? filtered[newActiveIdx].id : activeId;
+  return { pages: filtered, newActiveId };
+}
+
+function mpPageStats(pages: TestPageDef[]): Array<{ id: string; count: number; types: string[] }> {
+  return pages.map(p => ({ id: p.id, count: p.shapes.length, types: [...new Set(p.shapes.map(s => s.type))] }));
+}
+
+describe('MultiPagePanel utilities', () => {
+  // pageId
+  it('pageId: returns string starting with "page-"', () => {
+    expect(mpPageId()).toMatch(/^page-/);
+  });
+
+  it('pageId: returns unique values each call', () => {
+    const a = mpPageId();
+    const b = mpPageId();
+    expect(a).not.toBe(b);
+  });
+
+  // createPage
+  it('createPage: returns object with given name and empty shapes', () => {
+    const p = mpCreatePage('Home');
+    expect(p.name).toBe('Home');
+    expect(p.shapes).toEqual([]);
+  });
+
+  it('createPage: sets createdAt and updatedAt timestamps', () => {
+    const before = Date.now();
+    const p = mpCreatePage('Test');
+    expect(p.createdAt).toBeGreaterThanOrEqual(before);
+    expect(p.updatedAt).toBeGreaterThanOrEqual(before);
+  });
+
+  // renamePage
+  it('renamePage: renames the matching page', () => {
+    const pages = [mpCreatePage('A'), mpCreatePage('B')];
+    const renamed = mpRenamePage(pages, pages[0].id, 'Alpha');
+    expect(renamed[0].name).toBe('Alpha');
+    expect(renamed[1].name).toBe('B');
+  });
+
+  it('renamePage: non-matching id leaves pages unchanged', () => {
+    const pages = [mpCreatePage('X')];
+    const result = mpRenamePage(pages, 'nonexistent', 'Y');
+    expect(result[0].name).toBe('X');
+  });
+
+  // duplicatePage
+  it('duplicatePage: creates a page with a new id', () => {
+    const orig = mpCreatePage('Orig');
+    const dup = mpDuplicatePage(orig);
+    expect(dup.id).not.toBe(orig.id);
+  });
+
+  it('duplicatePage: default name appends "(copy)"', () => {
+    const orig = mpCreatePage('Design');
+    const dup = mpDuplicatePage(orig);
+    expect(dup.name).toBe('Design (copy)');
+  });
+
+  it('duplicatePage: accepts custom name', () => {
+    const orig = mpCreatePage('Design');
+    const dup = mpDuplicatePage(orig, 'Custom');
+    expect(dup.name).toBe('Custom');
+  });
+
+  it('duplicatePage: deep copies shapes so mutation is independent', () => {
+    const s: TestPageShape2 = { id: 's1', type: 'rect', x: 0, y: 0, width: 100, height: 50 };
+    const orig: TestPageDef = { ...mpCreatePage('P'), shapes: [s] };
+    const dup = mpDuplicatePage(orig);
+    dup.shapes[0].x = 999;
+    expect(orig.shapes[0].x).toBe(0);
+  });
+
+  // movePage
+  it('movePage: moves page left', () => {
+    const pages = [mpCreatePage('A'), mpCreatePage('B'), mpCreatePage('C')];
+    const result = mpMovePage(pages, pages[1].id, 'left');
+    expect(result[0].name).toBe('B');
+    expect(result[1].name).toBe('A');
+  });
+
+  it('movePage: moves page right', () => {
+    const pages = [mpCreatePage('A'), mpCreatePage('B'), mpCreatePage('C')];
+    const result = mpMovePage(pages, pages[1].id, 'right');
+    expect(result[1].name).toBe('C');
+    expect(result[2].name).toBe('B');
+  });
+
+  it('movePage: first page cannot go left', () => {
+    const pages = [mpCreatePage('A'), mpCreatePage('B')];
+    const result = mpMovePage(pages, pages[0].id, 'left');
+    expect(result[0].name).toBe('A');
+  });
+
+  it('movePage: last page cannot go right', () => {
+    const pages = [mpCreatePage('A'), mpCreatePage('B')];
+    const result = mpMovePage(pages, pages[1].id, 'right');
+    expect(result[1].name).toBe('B');
+  });
+
+  // deletePage
+  it('deletePage: removes the specified page', () => {
+    const pages = [mpCreatePage('A'), mpCreatePage('B'), mpCreatePage('C')];
+    const { pages: result } = mpDeletePage(pages, pages[1].id, pages[0].id);
+    expect(result.map(p => p.name)).toEqual(['A', 'C']);
+  });
+
+  it('deletePage: cannot delete when only one page remains', () => {
+    const pages = [mpCreatePage('Only')];
+    const { pages: result } = mpDeletePage(pages, pages[0].id, pages[0].id);
+    expect(result).toHaveLength(1);
+  });
+
+  it('deletePage: updates newActiveId when active page is deleted', () => {
+    const pages = [mpCreatePage('A'), mpCreatePage('B')];
+    const { newActiveId } = mpDeletePage(pages, pages[0].id, pages[0].id);
+    expect(newActiveId).toBe(pages[1].id);
+  });
+
+  it('deletePage: keeps activeId when non-active page is deleted', () => {
+    const pages = [mpCreatePage('A'), mpCreatePage('B')];
+    const { newActiveId } = mpDeletePage(pages, pages[1].id, pages[0].id);
+    expect(newActiveId).toBe(pages[0].id);
+  });
+
+  // pageStats
+  it('pageStats: returns count for each page', () => {
+    const s: TestPageShape2 = { id: 's1', type: 'rect', x: 0, y: 0, width: 10, height: 10 };
+    const pages: TestPageDef[] = [
+      { ...mpCreatePage('A'), shapes: [s] },
+      { ...mpCreatePage('B'), shapes: [] },
+    ];
+    const stats = mpPageStats(pages);
+    expect(stats[0].count).toBe(1);
+    expect(stats[1].count).toBe(0);
+  });
+
+  it('pageStats: deduplicates shape types', () => {
+    const s1: TestPageShape2 = { id: 'x1', type: 'rect', x: 0, y: 0, width: 10, height: 10 };
+    const s2: TestPageShape2 = { id: 'x2', type: 'rect', x: 0, y: 0, width: 10, height: 10 };
+    const pages: TestPageDef[] = [{ ...mpCreatePage('A'), shapes: [s1, s2] }];
+    const stats = mpPageStats(pages);
+    expect(stats[0].types).toEqual(['rect']);
+  });
+
+  it('pageStats: handles empty pages array', () => {
+    expect(mpPageStats([])).toEqual([]);
+  });
+
+  it('pageStats: mixed types per page', () => {
+    const s1: TestPageShape2 = { id: 'a', type: 'rect', x: 0, y: 0, width: 10, height: 10 };
+    const s2: TestPageShape2 = { id: 'b', type: 'text', x: 0, y: 0, width: 10, height: 10 };
+    const pages: TestPageDef[] = [{ ...mpCreatePage('X'), shapes: [s1, s2] }];
+    const stats = mpPageStats(pages);
+    expect(stats[0].types).toContain('rect');
+    expect(stats[0].types).toContain('text');
+  });
+});

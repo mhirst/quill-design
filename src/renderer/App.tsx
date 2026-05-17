@@ -133,6 +133,7 @@ import { AnnotationOverlayPanel } from './components/canvas/AnnotationOverlayPan
 import { ZIndexVisualizerPanel } from './components/canvas/ZIndexVisualizerPanel';
 import { DesignMetricsPanel } from './components/canvas/DesignMetricsPanel';
 import { AttentionHeatmapPanel } from './components/canvas/AttentionHeatmapPanel';
+import { MultiPagePanel } from './components/canvas/MultiPagePanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -535,6 +536,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showZIndexVisualizer, setShowZIndexVisualizer] = useState(false);
   const [showDesignMetrics, setShowDesignMetrics] = useState(false);
   const [showAttentionHeatmap, setShowAttentionHeatmap] = useState(false);
+  const [showMultiPage, setShowMultiPage] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -926,8 +928,8 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.shiftKey && e.altKey) { e.preventDefault(); setShowMotionPreview(v => !v); return; }
             if (e.shiftKey) { e.preventDefault(); setShowSnapshots(o => !o); return; }
             if (e.altKey) { e.preventDefault(); setShowMinimap(v => !v); return; }
-            // Note: ⌘⌥⇧M kept for MotionPath via alias below
-            break;
+            // ⌘M = Multi-Page Document Manager
+            e.preventDefault(); setShowMultiPage(v => !v); return;
           }
           // ── n — New doc / Comments / Noise texture / Spacing advisor ────────
           // ⌘⇧⌥N = Spacing Advisor, ⌘⇧N = Comment Mode, ⌘N = New Doc
@@ -2970,6 +2972,17 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
       <AttentionHeatmapPanel
         open={showAttentionHeatmap}
         onClose={() => setShowAttentionHeatmap(false)}
+      />
+
+      {/* Multi-Page Document Manager (⌘M) */}
+      <MultiPagePanel
+        open={showMultiPage}
+        onClose={() => setShowMultiPage(false)}
+        currentShapes={drawing.state.shapes}
+        onPageChange={(page) => {
+          drawingRef.current.reorderShapes(page.shapes);
+          showToast(`Switched to "${page.name}"`, 'action');
+        }}
       />
 
       {/* Typography Specimen Panel (⌘⇧⌥Y) */}
