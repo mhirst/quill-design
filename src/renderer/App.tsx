@@ -117,6 +117,7 @@ import { ShapeVariationsPanel, type ShapePatch as VariationPatch } from './compo
 import { GlobalSearchPanel } from './components/canvas/GlobalSearchPanel';
 import { ColorVisionOverlay } from './components/canvas/ColorVisionOverlay';
 import { PathInspectorPanel } from './components/canvas/PathInspectorPanel';
+import { FontPairingPanel } from './components/canvas/FontPairingPanel';
 import { ChevronRight, Plus, X } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
@@ -503,6 +504,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showColorVision, setShowColorVision] = useState(false);
   const [showPathInspector, setShowPathInspector] = useState(false);
+  const [showFontPairing, setShowFontPairing] = useState(false);
   const [designTokens, setDesignTokens] = useState<DesignToken[]>([]);
   const [tokenBindings, setTokenBindings] = useState<TokenBinding[]>([]);
   // Canvas rulers + guides
@@ -1003,10 +1005,12 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             if (e.altKey) { e.preventDefault(); setShowCSSSnippet(v => !v); return; }
             break;
           }
-          // ── y — Color harmony / Typography Specimen / Redo ────────────────
+          // ── y — Color harmony / Typography Specimen / Font Pairing / Redo ──
+          // ⌘⇧⌥Y = Typography Specimen, ⌘⌥Y = Font Pairing, ⌘⇧Y = Color Harmony, ⌘Y = Redo
           case 'y': {
             e.preventDefault();
             if (e.shiftKey && e.altKey) { setShowTypographySpecimen(v => !v); return; }
+            if (e.altKey) { setShowFontPairing(v => !v); return; }
             if (e.shiftKey) { setShowColorHarmony(o => !o); return; }
             drawingRef.current.redo(); showToast('Redo', 'action'); return;
           }
@@ -2696,6 +2700,19 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         selectedShape={selectedShape}
         onPatchShape={(patch) => {
           if (selectedShape) drawingRef.current.updateShape(selectedShape.id, patch);
+        }}
+      />
+
+      {/* Font Pairing Studio (⌘⌥Y) */}
+      <FontPairingPanel
+        open={showFontPairing}
+        onClose={() => setShowFontPairing(false)}
+        selectedShape={selectedShape}
+        onApplyFont={(patch) => {
+          if (selectedShape) {
+            drawingRef.current.updateShape(selectedShape.id, patch);
+            showToast(`Applied font: ${(patch as { fontFamily?: string }).fontFamily ?? 'font'}`, 'action');
+          }
         }}
       />
 
