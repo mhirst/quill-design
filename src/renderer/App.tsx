@@ -1382,13 +1382,16 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
     const drafting = d.state.drafting;
     d.commitDraft();
     if (drafting) analytics.track('shape_created', { type: drafting.shape.type });
-    // Auto-enter text edit mode for text shapes, and switch to cursor
-    if (drafting && drafting.shape.type === 'text') {
+    // Figma-style: after creating any shape, switch back to cursor so the user
+    // can immediately drag, resize, or edit it. The shape is already selected
+    // by commitDraft.
+    if (drafting) {
       setActiveTool('cursor');
-      setAutoEditId(drafting.shape.id);
-      setTimeout(() => setAutoEditId(null), 100);
+      if (drafting.shape.type === 'text') {
+        setAutoEditId(drafting.shape.id);
+        setTimeout(() => setAutoEditId(null), 100);
+      }
     }
-    // For all other shapes, stay on the current tool so the user can keep drawing
   }, []);
 
   const handleShapePreview = useCallback((patch: Partial<Shape>) => {
