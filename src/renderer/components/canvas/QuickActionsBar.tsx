@@ -12,6 +12,7 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
+import { Lock, Unlock, Eye, EyeOff, FlipHorizontal, FlipVertical, ChevronsUp, ChevronsDown, Copy, ClipboardPaste, Circle } from 'lucide-react';
 import type { Shape } from '../../lib/shapes';
 
 interface Props {
@@ -159,48 +160,48 @@ export function QuickActionsBar({
     >
       {/* Lock */}
       <Btn onClick={onToggleLock} active={s.locked} title={s.locked ? 'Unlock' : 'Lock'}>
-        {s.locked ? '⊠' : '⊡'}
+        {s.locked ? <Lock size={13} /> : <Unlock size={13} />}
       </Btn>
 
       {/* Hide/show */}
       <Btn onClick={onToggleHide} active={s.hidden} title={s.hidden ? 'Show' : 'Hide'}>
-        {s.hidden ? '⊘' : '◎'}
+        {s.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
       </Btn>
 
       <Sep />
 
       {/* Flip H */}
       <Btn onClick={onFlipH} title="Flip horizontal">
-        ⇔
+        <FlipHorizontal size={13} />
       </Btn>
 
       {/* Flip V */}
       <Btn onClick={onFlipV} title="Flip vertical">
-        ⇕
+        <FlipVertical size={13} />
       </Btn>
 
       <Sep />
 
       {/* Bring to front */}
       <Btn onClick={onBringToFront} disabled={isLast} title="Bring to front">
-        ↑↑
+        <ChevronsUp size={13} />
       </Btn>
 
       {/* Send to back */}
       <Btn onClick={onSendToBack} disabled={isFirst} title="Send to back">
-        ↓↓
+        <ChevronsDown size={13} />
       </Btn>
 
       <Sep />
 
       {/* Copy style */}
       <Btn onClick={onCopyStyle} title="Copy style (fill, stroke, effects)">
-        ✦
+        <Copy size={13} />
       </Btn>
 
       {/* Paste style */}
       <Btn onClick={onPasteStyle} disabled={!hasCopiedStyle} active={hasCopiedStyle} title={hasCopiedStyle ? 'Paste style' : 'No style copied'}>
-        ✦↓
+        <ClipboardPaste size={13} />
       </Btn>
 
       <Sep />

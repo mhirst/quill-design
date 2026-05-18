@@ -157,7 +157,7 @@ import { SpacingScalePanel } from './components/canvas/SpacingScalePanel';
 import { BorderRadiusStudio } from './components/canvas/BorderRadiusStudio';
 import { AdvancedAlignmentPanel } from './components/canvas/AdvancedAlignmentPanel';
 import { WCAGColorPairGenerator } from './components/canvas/WCAGColorPairGenerator';
-import { ChevronRight, Plus, X } from 'lucide-react';
+import { ChevronRight, Plus, X, Command, Keyboard, Layers, Zap, Search, Palette, Type as TypeIcon, Brush, Code2, Camera } from 'lucide-react';
 import type { ChatMessage } from '@shared/types';
 
 export default function App() {
@@ -4852,21 +4852,23 @@ function ActionRow({ label, shortcut, onClick }: { label: string; shortcut?: str
 
 // ── Design overview panel (shown in right panel when nothing selected) ─────────
 
-function OverviewAction({ label, shortcut, icon, onClick }: { label: string; shortcut?: string; icon?: string; onClick: () => void }) {
+function OverviewAction({ label, shortcut, icon, onClick }: { label: string; shortcut?: string; icon?: React.ReactNode; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         width: '100%', background: 'var(--panel-alt)', border: '1px solid var(--border)',
-        borderRadius: 5, padding: '5px 8px', cursor: 'pointer',
+        borderRadius: 5, padding: '6px 8px', cursor: 'pointer',
         color: 'var(--text)', fontSize: 11, gap: 8, textAlign: 'left',
       }}
       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; }}
       onMouseLeave={e => { e.currentTarget.style.background = 'var(--panel-alt)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
     >
-      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        {icon && <span style={{ fontSize: 12, opacity: 0.7 }}>{icon}</span>}
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, color: 'var(--muted)', flexShrink: 0 }}>
+          {icon}
+        </span>
         {label}
       </span>
       {shortcut && <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'monospace' }}>{shortcut}</span>}
@@ -4973,18 +4975,15 @@ function DesignOverviewPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', fontSize: 12 }}>
-      {/* Header */}
+      {/* Shape count summary */}
       <div style={{
-        height: 44, flexShrink: 0, display: 'flex', alignItems: 'center',
-        padding: '0 12px', gap: 8, borderBottom: '1px solid var(--border)',
+        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        padding: '8px 12px 4px',
       }}>
-        <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-          Design
-        </span>
         <span style={{
-          fontSize: 10, fontWeight: 700, color: 'var(--accent)',
+          fontSize: 10, fontWeight: 600, color: 'var(--accent)',
           background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
-          borderRadius: 4, padding: '1px 6px', marginLeft: 'auto',
+          borderRadius: 4, padding: '1px 6px',
         }}>
           {shapes.length} shape{shapes.length !== 1 ? 's' : ''}
         </span>
@@ -5038,31 +5037,31 @@ function DesignOverviewPanel({
       <div style={divSt}>
         <div style={panelSt}>Quick Actions</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <OverviewAction label="Command palette" shortcut="⌘K" icon="⌘" onClick={onOpenCommandPalette} />
-          <OverviewAction label="Keyboard shortcuts" shortcut="?" icon="⌨" onClick={onShowShortcuts} />
+          <OverviewAction label="Command palette" shortcut="⌘K" icon={<Command size={12} />} onClick={onOpenCommandPalette} />
+          <OverviewAction label="Keyboard shortcuts" shortcut="?" icon={<Keyboard size={12} />} onClick={onShowShortcuts} />
           {onShowDesignSystem && (
-            <OverviewAction label="Design system & tokens" shortcut="⌘⇧D" onClick={onShowDesignSystem} />
+            <OverviewAction label="Design system & tokens" shortcut="⌘⇧D" icon={<Layers size={12} />} onClick={onShowDesignSystem} />
           )}
           {onShowDesignLint && (
-            <OverviewAction label="Design lint & issues" shortcut="⇧L" icon="⚡" onClick={onShowDesignLint} />
+            <OverviewAction label="Design lint & issues" shortcut="⇧L" icon={<Zap size={12} />} onClick={onShowDesignLint} />
           )}
           {onShowFindReplace && (
-            <OverviewAction label="Find & replace text" shortcut="⌘⇧H" icon="🔍" onClick={onShowFindReplace} />
+            <OverviewAction label="Find & replace text" shortcut="⌘⇧H" icon={<Search size={12} />} onClick={onShowFindReplace} />
           )}
           {onShowColorHarmony && (
-            <OverviewAction label="Color harmony" shortcut="⌘⇧Y" icon="◉" onClick={onShowColorHarmony} />
+            <OverviewAction label="Color harmony" shortcut="⌘⇧Y" icon={<Palette size={12} />} onClick={onShowColorHarmony} />
           )}
           {onShowTypeScale && (
-            <OverviewAction label="Typography scale" shortcut="⌘⇧T" icon="T" onClick={onShowTypeScale} />
+            <OverviewAction label="Typography scale" shortcut="⌘⇧T" icon={<TypeIcon size={12} />} onClick={onShowTypeScale} />
           )}
           {onShowThemeCustomizer && (
-            <OverviewAction label="Theme customizer" shortcut="⌘⇧P" icon="🎨" onClick={onShowThemeCustomizer} />
+            <OverviewAction label="Theme customizer" shortcut="⌘⇧P" icon={<Brush size={12} />} onClick={onShowThemeCustomizer} />
           )}
           {onShowDevSpec && (
-            <OverviewAction label="Developer spec / handoff" shortcut="⌘⇧E" icon="</>" onClick={onShowDevSpec} />
+            <OverviewAction label="Developer spec / handoff" shortcut="⌘⇧E" icon={<Code2 size={12} />} onClick={onShowDevSpec} />
           )}
           {onShowSnapshots && (
-            <OverviewAction label="Canvas snapshots" shortcut="⌘⇧M" icon="📷" onClick={onShowSnapshots} />
+            <OverviewAction label="Canvas snapshots" shortcut="⌘⇧M" icon={<Camera size={12} />} onClick={onShowSnapshots} />
           )}
         </div>
       </div>

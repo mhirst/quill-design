@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown, Eye, EyeOff, Lock, Unlock, Focus } from 'lucide-react';
+import { ChevronRight, ChevronDown, Eye, EyeOff, Lock, Unlock, Focus, Frame, Square, Circle, Type, Pencil, Group } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { LayerNode } from '../../hooks/useCanvas';
 import type { Shape } from '../../lib/shapes';
@@ -271,17 +271,16 @@ function LayerNodeRow({ node, depth, selectedPath, onSelect }: NodeProps) {
 }
 
 // Shape type icons
-const SHAPE_ICONS: Record<Shape['type'], string> = {
-  frame: '⬜',
-  rectangle: '▬',
-  ellipse: '◯',
-  text: 'T',
-  path: '✏',
-};
-
-function shapeIcon(shape: Shape): string {
-  if (shape.isGroup) return '⊞';
-  return SHAPE_ICONS[shape.type] ?? '▪';
+function ShapeTypeIcon({ shape, size = 12 }: { shape: Shape; size?: number }) {
+  if (shape.isGroup) return <Group size={size} />;
+  switch (shape.type) {
+    case 'frame': return <Frame size={size} />;
+    case 'rectangle': return <Square size={size} />;
+    case 'ellipse': return <Circle size={size} />;
+    case 'text': return <Type size={size} />;
+    case 'path': return <Pencil size={size} />;
+    default: return <Square size={size} />;
+  }
 }
 
 interface Props {
@@ -432,8 +431,8 @@ export function LayerTree({ layerTree, onSelectPath, shapes, selectedShapeId, se
             onMouseEnter={(e) => handleRowMouseEnter(shape, e)}
             onMouseLeave={(e) => handleRowMouseLeave(isSelected, isDragOver, e)}
           >
-            <span style={{ fontSize: 10, color: isSelected ? 'var(--accent)' : 'var(--muted)', flexShrink: 0 }}>
-              {shapeIcon(shape)}
+            <span style={{ color: isSelected ? 'var(--accent)' : 'var(--muted)', flexShrink: 0, display: 'flex' }}>
+              <ShapeTypeIcon shape={shape} size={12} />
             </span>
             {/* Fill color swatch */}
             {shape.type !== 'text' && shape.type !== 'path' && shape.fill && shape.fill !== 'transparent' && (
@@ -457,14 +456,13 @@ export function LayerTree({ layerTree, onSelectPath, shapes, selectedShapeId, se
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   flex: 1, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.5)',
-                  borderRadius: 3, color: 'var(--accent)', fontSize: 11,
-                  padding: '1px 4px', outline: 'none', minWidth: 0, fontFamily: 'monospace',
+                  borderRadius: 3, color: 'var(--accent)', fontSize: 12,
+                  padding: '1px 4px', outline: 'none', minWidth: 0,
                 }}
               />
             ) : (
               <span style={{
                 flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontFamily: 'monospace',
               }}>
                 {shape.name}
               </span>
