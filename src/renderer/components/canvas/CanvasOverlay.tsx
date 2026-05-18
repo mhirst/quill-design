@@ -1761,25 +1761,37 @@ export function CanvasOverlay({
                   onCancel={() => setEditingId(null)}
                 />
               )}
-              {/* Auto-layout badge */}
-              {shape.layout !== 'none' && !isEditing && (
+              {/* Auto-layout badge — fixed screen size, shown when selected */}
+              {shape.layout !== 'none' && !isEditing && (selectedId === shape.id || selectedIds.includes(shape.id)) && (
                 <div style={{
                   position: 'absolute',
-                  bottom: 4 / zoom,
-                  right: 4 / zoom,
-                  width: 16 / zoom,
-                  height: 16 / zoom,
-                  background: 'rgba(99,102,241,0.85)',
-                  borderRadius: 3 / zoom,
+                  bottom: 6 / zoom,
+                  right: 6 / zoom,
+                  width: 18 / zoom,
+                  height: 18 / zoom,
+                  background: 'rgba(99,102,241,0.9)',
+                  borderRadius: 4 / zoom,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 10 / zoom,
-                  color: 'white',
                   pointerEvents: 'none',
-                  lineHeight: 1,
+                  backdropFilter: 'blur(2px)',
                 }}>
-                  {shape.layout === 'row' ? '→' : '↓'}
+                  <svg
+                    width={10 / zoom}
+                    height={10 / zoom}
+                    viewBox="0 0 10 10"
+                    fill="none"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {shape.layout === 'row' ? (
+                      // Horizontal arrows
+                      <path d="M1 5h8M6 2l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      // Vertical arrows
+                      <path d="M5 1v8M2 6l3 3 3-3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
+                  </svg>
                 </div>
               )}
               {/* Notes badge — shown on shapes with developer notes */}
