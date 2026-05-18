@@ -253,9 +253,9 @@ export function CanvasStatusBar({
 
       {/* Center: cursor position */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-        <span style={{ fontSize: 9, color: 'var(--subtle, #444)' }}>x</span>
+        <span style={{ fontSize: 10, color: 'var(--subtle, #444)' }}>x</span>
         <span style={{ fontSize: 10, color: 'var(--muted, #888)', fontVariantNumeric: 'tabular-nums', minWidth: 28, textAlign: 'right' }}>{canvasCursor[0]}</span>
-        <span style={{ fontSize: 9, color: 'var(--subtle, #444)' }}>y</span>
+        <span style={{ fontSize: 10, color: 'var(--subtle, #444)' }}>y</span>
         <span style={{ fontSize: 10, color: 'var(--muted, #888)', fontVariantNumeric: 'tabular-nums', minWidth: 28 }}>{canvasCursor[1]}</span>
       </div>
 
@@ -321,7 +321,7 @@ export function CanvasStatusBar({
         {/* FPS */}
         <span
           style={{
-            fontSize: 9,
+            fontSize: 10,
             color: fps >= 55 ? 'var(--subtle, #444)' : fps >= 30 ? '#f59e0b' : '#ef4444',
             fontVariantNumeric: 'tabular-nums',
             minWidth: 32,

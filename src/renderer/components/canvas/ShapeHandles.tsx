@@ -38,9 +38,6 @@ export function ShapeHandles({ shape, zoom, onResizeStart, onGradientAngleChange
   const handleSize = HANDLE_SIZE / zoom;
   const borderWidth = 1.5 / zoom;
 
-  // Rotation handle: sits above center-top, 28px above in screen space
-  const rotOffset = 28 / zoom;
-
   return (
     <div
       style={{
@@ -66,48 +63,6 @@ export function ShapeHandles({ shape, zoom, onResizeStart, onGradientAngleChange
         }}
       />
 
-      {/* Rotation handle — line + circle above center-top */}
-      <>
-        {/* Stem line */}
-        <div
-          style={{
-            position: 'absolute',
-            left: width / 2 - borderWidth / 2,
-            top: -rotOffset,
-            width: borderWidth,
-            height: rotOffset,
-            background: BORDER_COLOR,
-            opacity: 0.7,
-            pointerEvents: 'none',
-          }}
-        />
-        {/* Circle — larger transparent hit area wraps the visible dot */}
-        <div
-          onMouseDown={(e) => { e.stopPropagation(); onResizeStart('rotate', e); }}
-          style={{
-            position: 'absolute',
-            left: width / 2 - handleSize / 2 - HIT_EXTRA / zoom,
-            top: -rotOffset - handleSize - HIT_EXTRA / zoom,
-            width: handleSize + (HIT_EXTRA * 2) / zoom,
-            height: handleSize + (HIT_EXTRA * 2) / zoom,
-            cursor: 'grab',
-            pointerEvents: 'all',
-            zIndex: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <div style={{
-            width: handleSize,
-            height: handleSize,
-            background: 'white',
-            border: `${borderWidth}px solid ${BORDER_COLOR}`,
-            borderRadius: '50%',
-            pointerEvents: 'none',
-          }} />
-        </div>
-      </>
 
       {/* Gradient angle dial — shown when shape has a linear gradient fill */}
       {shape.fillType === 'linear-gradient' && onGradientAngleChange && (

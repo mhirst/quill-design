@@ -140,7 +140,7 @@ export function MinimapNavigator({
         title="Toggle minimap (⌘M)"
         style={{
           position: 'absolute',
-          bottom: 32,
+          bottom: 80,
           right: 8,
           width: 26,
           height: 26,

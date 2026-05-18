@@ -233,7 +233,7 @@ export function Minimap({ shapes, zoom, pan, viewportWidth, viewportHeight, onPa
     <div
       style={{
         position: 'absolute',
-        bottom: 48, // above cursor coords display
+        bottom: 76, // above status bar (24px) + zoom controls (32px) + gap (20px)
         right: 12,
         width: MINIMAP_W,
         height: MINIMAP_H,

@@ -211,15 +211,15 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
 
   const panel: React.CSSProperties = {
     position: 'fixed', top: 60, right: 16, width: 370,
-    background: '#0c1018', border: '1px solid #1c2330',
-    borderRadius: 12, zIndex: 1500, display: 'flex', flexDirection: 'column',
+    background: '#1e1e2e', border: '1px solid #2a2a3e',
+    borderRadius: 12, zIndex: 9019, display: 'flex', flexDirection: 'column',
     fontFamily: 'system-ui, sans-serif', color: '#e2e8f0',
     boxShadow: '0 20px 60px rgba(0,0,0,0.7)', overflow: 'hidden',
     maxHeight: 'calc(100vh - 80px)',
   };
 
   const input: React.CSSProperties = {
-    background: '#1e293b', border: '1px solid #334155', borderRadius: 5,
+    background: '#2a2a3e', border: '1px solid #3a3a55', borderRadius: 5,
     color: '#e2e8f0', padding: '4px 7px', fontSize: 11, outline: 'none',
     width: '100%', boxSizing: 'border-box',
   };
@@ -227,19 +227,19 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
   return (
     <div style={panel}>
       {/* Header */}
-      <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid #1c2330', flexShrink: 0 }}>
+      <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid #2a2a3e', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: 700, fontSize: 15, color: '#7dd3fc' }}>◈ Shadow Builder</span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#a78bfa' }}>◈ Shadow Builder</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}>×</button>
         </div>
-        <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
+        <div style={{ fontSize: 11, color: '#6b6b8a', marginTop: 2 }}>
           {layers.length} layer{layers.length !== 1 ? 's' : ''} · {layers.filter(l => l.enabled).length} active
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {/* Live preview */}
-        <div style={{ padding: '12px 14px', borderBottom: '1px solid #1c2330', background: bgColor }}>
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid #2a2a3e', background: bgColor }}>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 110 }}>
             <div style={{
               width: 140, height: 80, background: shapeColor, borderRadius: 10,
@@ -248,29 +248,29 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <label style={{ fontSize: 10, color: '#475569' }}>BG</label>
+              <label style={{ fontSize: 10, color: '#6b6b8a' }}>BG</label>
               <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)}
-                style={{ width: 24, height: 20, border: '1px solid #334155', borderRadius: 3, cursor: 'pointer', padding: 1, background: 'none' }}
+                style={{ width: 24, height: 20, border: '1px solid #3a3a55', borderRadius: 3, cursor: 'pointer', padding: 1, background: 'none' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <label style={{ fontSize: 10, color: '#475569' }}>Shape</label>
+              <label style={{ fontSize: 10, color: '#6b6b8a' }}>Shape</label>
               <input type="color" value={shapeColor} onChange={e => setShapeColor(e.target.value)}
-                style={{ width: 24, height: 20, border: '1px solid #334155', borderRadius: 3, cursor: 'pointer', padding: 1, background: 'none' }}
+                style={{ width: 24, height: 20, border: '1px solid #3a3a55', borderRadius: 3, cursor: 'pointer', padding: 1, background: 'none' }}
               />
             </div>
           </div>
         </div>
 
         {/* Presets */}
-        <div style={{ padding: '8px 14px', borderBottom: '1px solid #1c2330' }}>
+        <div style={{ padding: '8px 14px', borderBottom: '1px solid #2a2a3e' }}>
           <div style={{ display: 'flex', gap: 5, marginBottom: 7, overflowX: 'auto' }}>
             {PRESET_CATS.map(cat => (
               <button key={cat} onClick={() => setCatFilter(cat)} style={{
                 padding: '3px 8px', fontSize: 10, borderRadius: 5, flexShrink: 0,
-                background: catFilter === cat ? '#0e2a3a' : '#1e293b',
-                border: '1px solid ' + (catFilter === cat ? '#7dd3fc' : '#334155'),
-                color: catFilter === cat ? '#7dd3fc' : '#64748b', cursor: 'pointer',
+                background: catFilter === cat ? '#2a2040' : '#2a2a3e',
+                border: '1px solid ' + (catFilter === cat ? '#a78bfa' : '#3a3a55'),
+                color: catFilter === cat ? '#a78bfa' : '#6b6b8a', cursor: 'pointer',
               }}>{cat}</button>
             ))}
           </div>
@@ -278,21 +278,21 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
             {SHADOW_PRESETS.filter(p => p.category === catFilter).map(preset => (
               <button key={preset.name} onClick={() => applyPreset(preset)} style={{
                 padding: '4px 8px', fontSize: 10, borderRadius: 5,
-                background: '#1e293b', border: '1px solid #334155',
-                color: '#94a3b8', cursor: 'pointer',
+                background: '#2a2a3e', border: '1px solid #3a3a55',
+                color: '#9595b8', cursor: 'pointer',
               }}>{preset.name}</button>
             ))}
           </div>
         </div>
 
         {/* Layer list */}
-        <div style={{ padding: '8px 14px', borderBottom: '1px solid #1c2330' }}>
+        <div style={{ padding: '8px 14px', borderBottom: '1px solid #2a2a3e' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ fontSize: 10, color: '#475569' }}>LAYERS</span>
+            <span style={{ fontSize: 10, color: '#6b6b8a' }}>LAYERS</span>
             <button onClick={addLayer} style={{
               padding: '3px 8px', fontSize: 10, borderRadius: 5,
-              background: '#0e2a3a', border: '1px solid #7dd3fc',
-              color: '#7dd3fc', cursor: 'pointer',
+              background: '#2a2040', border: '1px solid #a78bfa',
+              color: '#a78bfa', cursor: 'pointer',
             }}>+ Add Layer</button>
           </div>
           {layers.map((layer, idx) => (
@@ -302,28 +302,28 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
                 borderRadius: 6, cursor: 'pointer', marginBottom: 3,
-                background: selectedLayerIdx === idx ? '#0e2a3a' : 'transparent',
-                border: '1px solid ' + (selectedLayerIdx === idx ? '#7dd3fc' : 'transparent'),
+                background: selectedLayerIdx === idx ? '#2a2040' : 'transparent',
+                border: '1px solid ' + (selectedLayerIdx === idx ? '#a78bfa' : 'transparent'),
               }}
             >
               <button
                 onClick={e => { e.stopPropagation(); updateLayer(idx, 'enabled', !layer.enabled); }}
                 style={{
-                  width: 14, height: 14, borderRadius: 3, border: '1px solid #334155',
-                  background: layer.enabled ? '#7dd3fc' : '#1e293b', cursor: 'pointer', padding: 0,
+                  width: 14, height: 14, borderRadius: 3, border: '1px solid #3a3a55',
+                  background: layer.enabled ? '#a78bfa' : '#2a2a3e', cursor: 'pointer', padding: 0,
                 }}
               />
-              <div style={{ width: 16, height: 16, background: hexWithOpacity(layer.color, layer.opacity), borderRadius: 3, border: '1px solid #334155', flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: 11, color: layer.enabled ? '#e2e8f0' : '#475569' }}>
+              <div style={{ width: 16, height: 16, background: hexWithOpacity(layer.color, layer.opacity), borderRadius: 3, border: '1px solid #3a3a55', flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 11, color: layer.enabled ? '#e2e8f0' : '#6b6b8a' }}>
                 {layer.inset ? 'inset ' : ''}{layer.x}px {layer.y}px {layer.blur}px
               </span>
               <button
                 onClick={e => { e.stopPropagation(); setLayers(l => { const nl = [...l]; nl.splice(idx, 0, duplicateLayer(layer)); return nl; }); }}
-                style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 12 }}
+                style={{ background: 'none', border: 'none', color: '#6b6b8a', cursor: 'pointer', fontSize: 12 }}
               >⎘</button>
               <button
                 onClick={e => { e.stopPropagation(); if (layers.length > 1) removeLayer(idx); }}
-                style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 14 }}
+                style={{ background: 'none', border: 'none', color: '#6b6b8a', cursor: 'pointer', fontSize: 14 }}
               >×</button>
             </div>
           ))}
@@ -331,8 +331,8 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
 
         {/* Selected layer editor */}
         {selected && (
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid #1c2330' }}>
-            <div style={{ fontSize: 10, color: '#475569', marginBottom: 8 }}>LAYER {selectedLayerIdx + 1} SETTINGS</div>
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid #2a2a3e' }}>
+            <div style={{ fontSize: 10, color: '#6b6b8a', marginBottom: 8 }}>LAYER {selectedLayerIdx + 1} SETTINGS</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
               {[
                 { key: 'x' as const, label: 'X Offset', min: -50, max: 50 },
@@ -344,9 +344,9 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
                   <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 2 }}>{label} (px)</label>
                   <input type="range" min={min} max={max} value={selected[key]}
                     onChange={e => updateLayer(selectedLayerIdx, key, Number(e.target.value))}
-                    style={{ width: '100%', accentColor: '#7dd3fc', marginBottom: 2 }}
+                    style={{ width: '100%', accentColor: '#a78bfa', marginBottom: 2 }}
                   />
-                  <div style={{ fontSize: 10, color: '#7dd3fc', textAlign: 'center', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 10, color: '#a78bfa', textAlign: 'center', fontFamily: 'monospace' }}>
                     {selected[key]}
                   </div>
                 </div>
@@ -354,11 +354,11 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
               <div>
-                <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 3 }}>Color</label>
+                <label style={{ fontSize: 10, color: '#6b6b8a', display: 'block', marginBottom: 3 }}>Color</label>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input type="color" value={selected.color}
                     onChange={e => updateLayer(selectedLayerIdx, 'color', e.target.value)}
-                    style={{ width: 32, height: 28, border: '1px solid #334155', borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none' }}
+                    style={{ width: 32, height: 28, border: '1px solid #3a3a55', borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none' }}
                   />
                   <input type="text" value={selected.color}
                     onChange={e => updateLayer(selectedLayerIdx, 'color', e.target.value)}
@@ -367,17 +367,17 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 3 }}>Opacity ({selected.opacity}%)</label>
+                <label style={{ fontSize: 10, color: '#6b6b8a', display: 'block', marginBottom: 3 }}>Opacity ({selected.opacity}%)</label>
                 <input type="range" min={0} max={100} value={selected.opacity}
                   onChange={e => updateLayer(selectedLayerIdx, 'opacity', Number(e.target.value))}
-                  style={{ width: '100%', accentColor: '#7dd3fc', marginTop: 6 }}
+                  style={{ width: '100%', accentColor: '#a78bfa', marginTop: 6 }}
                 />
               </div>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#94a3b8' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#9595b8' }}>
               <input type="checkbox" checked={selected.inset}
                 onChange={e => updateLayer(selectedLayerIdx, 'inset', e.target.checked)}
-                style={{ accentColor: '#7dd3fc' }}
+                style={{ accentColor: '#a78bfa' }}
               />
               Inset shadow
             </label>
@@ -386,17 +386,17 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
 
         {/* CSS output */}
         <div style={{ padding: '10px 14px' }}>
-          <div style={{ fontSize: 10, color: '#475569', marginBottom: 5 }}>CSS OUTPUT</div>
+          <div style={{ fontSize: 10, color: '#6b6b8a', marginBottom: 5 }}>CSS OUTPUT</div>
           <pre style={{
-            background: '#060a10', border: '1px solid #1c2330', borderRadius: 8,
-            padding: '10px 12px', fontSize: 10, color: '#7dd3fc', fontFamily: 'monospace',
+            background: '#13131f', border: '1px solid #2a2a3e', borderRadius: 8,
+            padding: '10px 12px', fontSize: 10, color: '#a78bfa', fontFamily: 'monospace',
             overflowX: 'auto', margin: '0 0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           }}>{fullCSS}</pre>
           <button onClick={copyCSS} style={{
             width: '100%', padding: '8px 0',
-            background: copied ? '#14532d' : '#1e293b',
-            border: '1px solid ' + (copied ? '#10b981' : '#334155'),
-            borderRadius: 8, color: copied ? '#6ee7b7' : '#94a3b8',
+            background: copied ? '#1a2e1a' : '#2a2a3e',
+            border: '1px solid ' + (copied ? '#10b981' : '#3a3a55'),
+            borderRadius: 8, color: copied ? '#6ee7b7' : '#9595b8',
             fontSize: 12, cursor: 'pointer', transition: 'all 0.2s',
           }}>{copied ? '✓ Copied!' : 'Copy CSS'}</button>
         </div>

@@ -21,7 +21,7 @@ export function InspectPanel({ selection, isPatching, onPatch }: Props) {
   return (
     <div
       className="flex flex-col h-full overflow-hidden"
-      style={{ background: 'var(--panel)', borderLeft: '1px solid var(--border)' }}
+      style={{ background: 'var(--panel)' }}
     >
       {/* Header */}
       <div

@@ -159,12 +159,12 @@ export function QuickActionsBar({
     >
       {/* Lock */}
       <Btn onClick={onToggleLock} active={s.locked} title={s.locked ? 'Unlock' : 'Lock'}>
-        {s.locked ? '🔒' : '🔓'}
+        {s.locked ? '⊠' : '⊡'}
       </Btn>
 
       {/* Hide/show */}
       <Btn onClick={onToggleHide} active={s.hidden} title={s.hidden ? 'Show' : 'Hide'}>
-        {s.hidden ? '👁' : '◌'}
+        {s.hidden ? '⊘' : '◎'}
       </Btn>
 
       <Sep />

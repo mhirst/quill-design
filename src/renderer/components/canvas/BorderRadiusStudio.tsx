@@ -127,7 +127,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   initialRadius?: number;
-  onApply?: (radius: number) => void;  // applies a single uniform radius to shape
+  onApply?: (radius: number | [number, number, number, number]) => void;
 }
 
 type TabId = 'editor' | 'presets' | 'export';
@@ -362,7 +362,7 @@ export function BorderRadiusStudio({ open, onClose, initialRadius = 8, onApply }
                 border: `1px solid ${border}`, color: textMuted, cursor: 'pointer', fontSize: 11,
               }}>Pill</button>
               {onApply && (
-                <button onClick={() => onApply(avg)} style={{
+                <button onClick={() => onApply(allEqual ? corners.tl : [corners.tl, corners.tr, corners.br, corners.bl])} style={{
                   padding: '6px 12px', borderRadius: 6,
                   background: `${accent}22`, border: `1px solid ${accent}55`,
                   color: accent, cursor: 'pointer', fontSize: 11, fontWeight: 600,

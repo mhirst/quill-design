@@ -415,6 +415,12 @@ export function CanvasOverlay({
   panRef.current = pan;
   zoomRef.current = zoom;
 
+  // Stable refs for rotation zone detection in mousemove
+  const selectedShapeRef = useRef<Shape | null>(null);
+  const activeToolRef = useRef(activeTool);
+  selectedShapeRef.current = shapes.find(s => s.id === selectedId) ?? null;
+  activeToolRef.current = activeTool;
+
   // Sync viewport changes to parent (for rulers, etc.)
   const onViewportChangeRef = useRef(onViewportChange);
   onViewportChangeRef.current = onViewportChange;
@@ -488,34 +494,24 @@ export function CanvasOverlay({
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        // Pinch-to-zoom or Ctrl+scroll — zoom toward cursor
-        const delta = -e.deltaY * 0.005;
-        setZoom(z => {
-          const next = Math.min(8, Math.max(0.1, z * (1 + delta)));
-          const rect = el.getBoundingClientRect();
-          const mx = e.clientX - rect.left;
-          const my = e.clientY - rect.top;
-          setPan(p => ({
-            x: mx - (mx - p.x) * (next / z),
-            y: my - (my - p.y) * (next / z),
-          }));
-          return next;
-        });
-      } else if (e.altKey) {
-        // Alt+scroll = zoom (alternative for trackpad users)
-        const delta = -e.deltaY * 0.005;
-        setZoom(z => {
-          const next = Math.min(8, Math.max(0.1, z * (1 + delta)));
-          const rect = el.getBoundingClientRect();
-          const mx = e.clientX - rect.left;
-          const my = e.clientY - rect.top;
-          setPan(p => ({
-            x: mx - (mx - p.x) * (next / z),
-            y: my - (my - p.y) * (next / z),
-          }));
-          return next;
-        });
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        // Ctrl/Meta/Alt+scroll = zoom toward cursor
+        // Normalize deltaY: deltaMode 1 = lines (~20px each), 0 = pixels
+        const rawDY = e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY;
+        // Clamp per-event delta so one mouse tick never jumps more than ~10%
+        const clampedDY = Math.max(-60, Math.min(60, rawDY));
+        const delta = -clampedDY * 0.0015;
+        const rect = el.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const z = zoomRef.current;
+        const next = Math.min(8, Math.max(0.1, z * (1 + delta)));
+        const ratio = next / z;
+        setZoom(next);
+        setPan(p => ({
+          x: mx - (mx - p.x) * ratio,
+          y: my - (my - p.y) * ratio,
+        }));
       } else {
         // Plain scroll = pan (like Figma)
         setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
@@ -532,6 +528,36 @@ export function CanvasOverlay({
       {
         const cvs = screenToCanvas(e.clientX, e.clientY);
         setCursorPos({ x: Math.round(cvs.x), y: Math.round(cvs.y) });
+      }
+
+      // Update cursor for rotation zone (uses selectedShapeRef so no stale closure)
+      if (overlayRef.current && !panningRef.current) {
+        const rotShape = selectedShapeRef.current;
+        const activeT = activeToolRef.current;
+        if (rotShape && activeT === 'cursor') {
+          const el = overlayRef.current;
+          const rect = el.getBoundingClientRect();
+          const z = zoomRef.current;
+          const p = panRef.current;
+          const left   = rotShape.x * z + p.x + rect.left;
+          const top    = rotShape.y * z + p.y + rect.top;
+          const right  = (rotShape.x + rotShape.width)  * z + p.x + rect.left;
+          const bottom = (rotShape.y + rotShape.height) * z + p.y + rect.top;
+          const OUTER = 20, INNER = 8;
+          const inZone = ([
+            [left, top], [right, top], [right, bottom], [left, bottom],
+          ] as [number, number][]).some(([cx, cy]) => {
+            const dx = Math.abs(e.clientX - cx);
+            const dy = Math.abs(e.clientY - cy);
+            return dx <= OUTER && dy <= OUTER && (dx > INNER || dy > INNER);
+          });
+          const RCURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M10 3 A7 7 0 1 1 4 15' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M3.5 10 L1 14 L6 14Z' fill='white'/%3E%3C/svg%3E") 10 10, crosshair`;
+          if (inZone) {
+            el.style.cursor = RCURSOR;
+          } else if (el.style.cursor === RCURSOR) {
+            el.style.cursor = '';
+          }
+        }
       }
 
       // Pan
@@ -771,6 +797,7 @@ export function CanvasOverlay({
   }, []);
   // Note: zoom is read from zoomRef.current (stable ref), so no need to include it in deps
 
+
   const handleOverlayMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
@@ -784,6 +811,35 @@ export function CanvasOverlay({
         panStartRef.current = { mx: e.clientX, my: e.clientY, px: panRef.current.x, py: panRef.current.y };
         if (overlayRef.current) overlayRef.current.style.cursor = 'grabbing';
         return;
+      }
+
+      // Rotation zone — just outside corners of selected shape
+      {
+        const rotShape = selectedShapeRef.current;
+        const el = overlayRef.current;
+        if (rotShape && el) {
+          const rect = el.getBoundingClientRect();
+          const z = zoomRef.current;
+          const p = panRef.current;
+          const left   = rotShape.x * z + p.x + rect.left;
+          const top    = rotShape.y * z + p.y + rect.top;
+          const right  = (rotShape.x + rotShape.width)  * z + p.x + rect.left;
+          const bottom = (rotShape.y + rotShape.height) * z + p.y + rect.top;
+          const OUTER = 20, INNER = 8;
+          const inZone = ([
+            [left, top], [right, top], [right, bottom], [left, bottom],
+          ] as [number, number][]).some(([cx, cy]) => {
+            const dx = Math.abs(e.clientX - cx);
+            const dy = Math.abs(e.clientY - cy);
+            return dx <= OUTER && dy <= OUTER && (dx > INNER || dy > INNER);
+          });
+          if (inZone) {
+            const { x, y } = screenToCanvas(e.clientX, e.clientY);
+            dragRef.current = { type: 'resize', originX: x, originY: y };
+            onResizeStart(rotShape.id, 'rotate', x, y, rotShape);
+            return;
+          }
+        }
       }
 
       const { x, y } = screenToCanvas(e.clientX, e.clientY);
@@ -812,7 +868,7 @@ export function CanvasOverlay({
       // Start marquee selection drag
       dragRef.current = { type: 'marquee', originX: x, originY: y };
     },
-    [activeTool, screenToCanvas, onDrawStart, onSelect, onPenClick, onPenCommit, onCanvasPointerDown] // pan removed — read from panRef
+    [activeTool, screenToCanvas, onDrawStart, onSelect, onPenClick, onPenCommit, onCanvasPointerDown, onResizeStart] // pan/zoom/selectedShape read from refs
   );
 
   const handleShapeContextMenu = useCallback(
@@ -1500,16 +1556,21 @@ export function CanvasOverlay({
             const isPulling = penPullingHandleRef?.current ?? false;
             // For cursor ghost: show when not pulling a handle and not dragging an anchor
             const showCursor = penCursor && !isPulling && penDragPointIndex === null;
+            const hr = 3.5 / zoom; // handle dot radius
+            const ar = 4.5 / zoom; // anchor dot radius
+            // Close-path hover: cursor near first point when ≥3 points placed
+            const canClose = penPoints.length >= 3;
+            const closeSnapRadius = 12 / zoom;
+            const nearFirst = canClose && penCursor && !isPulling && penDragPointIndex === null &&
+              Math.hypot(penCursor.x - penPoints[0].x, penCursor.y - penPoints[0].y) < closeSnapRadius;
             // Build preview path — shows the actual curve that would result from clicking at cursor.
             // If the last placed node has an out-handle (cp2), use it as the outgoing control point
             // of the preview segment. The cursor itself has no handles yet so c2 = cursor position.
             let previewPts = penPoints;
-            if (showCursor) {
+            if (showCursor && !nearFirst) {
               previewPts = [...penPoints, { x: penCursor!.x, y: penCursor!.y }];
             }
-            const d = buildPathD(previewPts, false);
-            const hr = 3.5 / zoom; // handle dot radius
-            const ar = 4.5 / zoom; // anchor dot radius
+            const d = buildPathD(previewPts, nearFirst ? true : false);
 
             return (
               <g>
@@ -1549,20 +1610,25 @@ export function CanvasOverlay({
                       )}
                       {/* Anchor point */}
                       <circle
-                        cx={pt.x} cy={pt.y} r={ar}
-                        fill={penDragPointIndex === i ? '#6366f1' : 'white'}
-                        stroke="#6366f1" strokeWidth={1.5 / zoom}
-                        style={{ pointerEvents: 'all', cursor: 'move' }}
-                        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onPenStartDragPoint?.(i); }}
+                        cx={pt.x} cy={pt.y} r={i === 0 && nearFirst ? ar * 1.8 : ar}
+                        fill={i === 0 && nearFirst ? '#6366f1' : (penDragPointIndex === i ? '#6366f1' : 'white')}
+                        stroke={i === 0 && nearFirst ? '#ffffff' : '#6366f1'}
+                        strokeWidth={(i === 0 && nearFirst ? 2 : 1.5) / zoom}
+                        style={{ pointerEvents: 'all', cursor: i === 0 && canClose ? 'pointer' : 'move' }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation(); e.preventDefault();
+                          if (i === 0 && canClose) { onPenCommit?.(true); }
+                          else { onPenStartDragPoint?.(i); }
+                        }}
                         onMouseEnter={(e) => { (e.currentTarget as SVGCircleElement).setAttribute('fill', '#a5b4fc'); }}
-                        onMouseLeave={(e) => { (e.currentTarget as SVGCircleElement).setAttribute('fill', penDragPointIndex === i ? '#6366f1' : 'white'); }}
+                        onMouseLeave={(e) => { (e.currentTarget as SVGCircleElement).setAttribute('fill', i === 0 && nearFirst ? '#6366f1' : (penDragPointIndex === i ? '#6366f1' : 'white')); }}
                       />
                     </g>
                   );
                 })}
 
-                {/* Cursor ghost dot */}
-                {showCursor && (
+                {/* Cursor ghost dot — hidden when snapping to close */}
+                {showCursor && !nearFirst && (
                   <circle cx={penCursor!.x} cy={penCursor!.y} r={ar}
                     fill="#6366f1" opacity={0.5} style={{ pointerEvents: 'none' }} />
                 )}
@@ -1588,28 +1654,6 @@ export function CanvasOverlay({
                 pointerEvents: 'none',
                 boxSizing: 'border-box',
               }} />
-              {/* Shape name label above */}
-              {zoom > 0.3 && (
-                <div style={{
-                  position: 'absolute',
-                  left: h.x,
-                  top: h.y - 18 / zoom,
-                  background: 'rgba(99,102,241,0.85)',
-                  color: 'white',
-                  fontSize: labelFontSize,
-                  fontFamily: 'monospace',
-                  padding: `${1/zoom}px ${4/zoom}px`,
-                  borderRadius: 3 / zoom,
-                  pointerEvents: 'none',
-                  whiteSpace: 'nowrap',
-                  maxWidth: Math.max(60, h.width) + 'px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  lineHeight: 1.4,
-                }}>
-                  {h.name}
-                </div>
-              )}
             </>
           );
         })()}
@@ -1705,7 +1749,7 @@ export function CanvasOverlay({
               }}
             >
               {shape.type === 'text' && !isEditing && (
-                <span style={{ pointerEvents: 'none' }}>{shape.text}</span>
+                <span style={{ pointerEvents: 'none', width: '100%', textAlign: shape.textAlign as 'left' | 'center' | 'right' }}>{shape.text}</span>
               )}
               {shape.type === 'text' && isEditing && (
                 <TextareaEditor
@@ -1959,91 +2003,6 @@ export function CanvasOverlay({
                 onGradientAngleChange={(angle) => onShapePreview?.(selectedShape.id, { gradientAngle: angle })}
                 onGradientAngleCommit={(angle) => onShapeChange?.(selectedShape.id, { gradientAngle: angle })}
               />
-              {/* Dimension label + quick action toolbar above selection */}
-              <div style={{
-                position: 'absolute',
-                left: bb.x + bb.width / 2,
-                top: bb.y - 28 / zoom,
-                transform: 'translateX(-50%)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 / zoom,
-                pointerEvents: 'none',
-              }}>
-                {/* Quick action toolbar — rendered at a fixed screen size using inverse zoom */}
-                {!isDraggingMove && !isDraggingResize && zoom >= 0.3 && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 2 / zoom,
-                    background: 'var(--panel)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 7 / zoom,
-                    padding: `${3 / zoom}px ${4 / zoom}px`,
-                    boxShadow: `0 ${4 / zoom}px ${12 / zoom}px rgba(0,0,0,0.35)`,
-                    pointerEvents: 'all',
-                    transform: `scale(${1 / zoom})`,
-                    transformOrigin: 'center bottom',
-                  }}>
-                    {/* Duplicate */}
-                    <QuickActionBtn title="Duplicate (⌘D)" zoom={zoom} onClick={() => onDuplicate?.()}>
-                      <svg viewBox="0 0 12 12" fill="none" width="12" height="12">
-                        <rect x="1" y="4" width="7" height="7" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
-                        <rect x="4" y="1" width="7" height="7" rx="1.2" stroke="currentColor" strokeWidth="1.2" fill="var(--panel)"/>
-                      </svg>
-                    </QuickActionBtn>
-                    {/* Flip H */}
-                    <QuickActionBtn title="Flip horizontal" zoom={zoom} onClick={() => onShapeChange?.(selectedShape.id, { flipX: !selectedShape.flipX })}>
-                      <svg viewBox="0 0 12 12" fill="none" width="12" height="12">
-                        <path d="M6 1v10M2 3l-1 3 1 3M10 3l1 3-1 3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                        <rect x="2.5" y="3.5" width="3" height="5" rx="0.5" fill="currentColor" opacity="0.5"/>
-                      </svg>
-                    </QuickActionBtn>
-                    {/* Lock / unlock */}
-                    <QuickActionBtn title={selectedShape.locked ? 'Unlock (L)' : 'Lock (L)'} zoom={zoom} onClick={() => onShapeChange?.(selectedShape.id, { locked: !selectedShape.locked })} active={selectedShape.locked}>
-                      <svg viewBox="0 0 12 12" fill="none" width="12" height="12">
-                        <rect x="2" y="5.5" width="8" height="5.5" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
-                        {selectedShape.locked
-                          ? <path d="M4 5.5V3.8a2 2 0 0 1 4 0v1.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                          : <path d="M8 5.5V3.8a2 2 0 0 0-4 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                        }
-                        <circle cx="6" cy="8.5" r="1" fill="currentColor"/>
-                      </svg>
-                    </QuickActionBtn>
-                    {/* Hide */}
-                    <QuickActionBtn title={selectedShape.hidden ? 'Show (⇧H)' : 'Hide (⇧H)'} zoom={zoom} onClick={() => onShapeChange?.(selectedShape.id, { hidden: !selectedShape.hidden })} active={selectedShape.hidden}>
-                      <svg viewBox="0 0 12 12" fill="none" width="12" height="12">
-                        {selectedShape.hidden ? (
-                          <><path d="M1 6s2-4 5-4 5 4 5 4-2 4-5 4-5-4-5-4z" stroke="currentColor" strokeWidth="1.2"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M2 2l8 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></>
-                        ) : (
-                          <><path d="M1 6s2-4 5-4 5 4 5 4-2 4-5 4-5-4-5-4z" stroke="currentColor" strokeWidth="1.2"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2"/></>
-                        )}
-                      </svg>
-                    </QuickActionBtn>
-                    {/* Separator */}
-                    <div style={{ width: 1 / zoom, height: 14 / zoom, background: 'var(--border)', margin: `0 ${2 / zoom}px`, flexShrink: 0 }} />
-                    {/* Delete */}
-                    <QuickActionBtn title="Delete (Del)" zoom={zoom} onClick={() => onDelete?.()} danger>
-                      <svg viewBox="0 0 12 12" fill="none" width="12" height="12">
-                        <path d="M2 3h8M5 3V2h2v1M4 3v7h4V3H4z" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </QuickActionBtn>
-                  </div>
-                )}
-                {/* Dimension badge */}
-                <div style={{
-                  background: '#6366f1',
-                  color: 'white',
-                  fontSize: 11 / zoom,
-                  fontFamily: 'monospace',
-                  padding: `${2 / zoom}px ${6 / zoom}px`,
-                  borderRadius: 4 / zoom,
-                  whiteSpace: 'nowrap',
-                  lineHeight: 1.4,
-                  pointerEvents: 'none',
-                }}>
-                  {selectedShape.name !== selectedShape.type.charAt(0).toUpperCase() + selectedShape.type.slice(1) && selectedShape.name
-                    ? `${selectedShape.name}  `
-                    : ''}
-                  {Math.round(bb.width)} × {Math.round(bb.height)}
-                </div>
-              </div>
             </>
           );
         })()}
@@ -2618,87 +2577,6 @@ export function CanvasOverlay({
         />
       )}
 
-      {/* ── Shape hover mini-toolbar (screen space) ──────────────────────── */}
-      {activeTool === 'cursor' && hoveredShapeId && hoveredShapeId !== selectedId && !selectedIds.includes(hoveredShapeId) && onShapeChange && (() => {
-        const h = shapes.find(s => s.id === hoveredShapeId && !s.hidden && !s.locked);
-        if (!h || h.type === 'path' || zoom < 0.4) return null;
-        // Position toolbar in screen space, above the shape
-        const screenX = h.x * zoom + pan.x + h.width * zoom / 2;
-        const screenY = h.y * zoom + pan.y;
-        const toolbarW = 124;
-        const toolbarH = 28;
-        const clampedX = Math.max(toolbarW / 2 + 8, Math.min((overlayRef.current?.clientWidth ?? 800) - toolbarW / 2 - 8, screenX));
-        const clampedY = Math.max(8, screenY - toolbarH - 6);
-        return (
-          <div
-            style={{
-              position: 'absolute',
-              left: clampedX - toolbarW / 2,
-              top: clampedY,
-              width: toolbarW,
-              height: toolbarH,
-              background: 'var(--panel)',
-              border: '1px solid var(--border)',
-              borderRadius: 7,
-              display: 'flex', alignItems: 'center', gap: 1,
-              padding: '0 4px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              zIndex: 25,
-              pointerEvents: 'all',
-              backdropFilter: 'blur(8px)',
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {([
-              {
-                title: 'Select',
-                icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2L5 10L6.5 6.5L10 5L2 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>,
-                onClick: () => { onSelect(h.id); },
-              },
-              {
-                title: 'Duplicate',
-                icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.1"/><rect x="1" y="1" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.1" fill="var(--panel)"/></svg>,
-                onClick: () => { onSelect(h.id); onDuplicate?.(); },
-              },
-              {
-                title: h.locked ? 'Unlock' : 'Lock',
-                icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="5.5" width="8" height="5.5" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>{h.locked ? <path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/> : <path d="M8 5.5V4a2 2 0 0 0-4 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>}<circle cx="6" cy="8.5" r="1" fill="currentColor"/></svg>,
-                active: h.locked,
-                onClick: () => onShapeChange?.(h.id, { locked: !h.locked }),
-              },
-              {
-                title: 'Hide',
-                icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6s2-4 5-4 5 4 5 4-2 4-5 4-5-4-5-4z" stroke="currentColor" strokeWidth="1.1"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.1"/></svg>,
-                onClick: () => onShapeChange?.(h.id, { hidden: true }),
-              },
-              {
-                title: 'Delete',
-                color: '#ef4444',
-                icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4h8M5 4V2.5h2V4M4 4l.5 6h3L8 4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-                onClick: () => { onSelect(h.id); onDelete?.(); },
-              },
-            ] as { title: string; icon: React.ReactNode; active?: boolean; color?: string; onClick: () => void }[]).map((btn, i) => (
-              <button
-                key={i}
-                title={btn.title}
-                onMouseDown={(e) => { e.stopPropagation(); btn.onClick(); }}
-                style={{
-                  flex: 1, height: 22, borderRadius: 5, border: 'none',
-                  background: btn.active ? 'rgba(99,102,241,0.15)' : 'none',
-                  color: btn.active ? 'var(--accent)' : (btn.color ?? 'var(--muted)'),
-                  cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.1s, color 0.1s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--panel-alt)'; e.currentTarget.style.color = btn.color ?? 'var(--text)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = btn.active ? 'rgba(99,102,241,0.15)' : 'none'; e.currentTarget.style.color = btn.active ? 'var(--accent)' : (btn.color ?? 'var(--muted)'); }}
-              >
-                {btn.icon}
-              </button>
-            ))}
-          </div>
-        );
-      })()}
 
       {/* ── Pen tool hint bar ────────────────────────────────────────────── */}
       {activeTool === 'pen' && (
@@ -2805,7 +2683,7 @@ export function CanvasOverlay({
       {cursorPos && (
         <div style={{
           position: 'absolute',
-          bottom: 12,
+          bottom: 32,
           left: 12,
           background: 'var(--panel)',
           border: '1px solid var(--border)',
@@ -2829,7 +2707,7 @@ export function CanvasOverlay({
       <CanvasBgPicker color={canvasBgColor} onChange={setCanvasBgColor} />
 
       {/* ── Background pattern picker ──────────────────────────────────────── */}
-      <div style={{ position: 'absolute', bottom: 12, right: 260, zIndex: 20, pointerEvents: 'all' }}>
+      <div style={{ position: 'absolute', bottom: 32, right: 260, zIndex: 20, pointerEvents: 'all' }}>
         <div style={{ position: 'relative' }}>
           <button
             onMouseDown={(e) => { e.stopPropagation(); setShowBgPatternPicker(p => !p); }}
@@ -2910,7 +2788,7 @@ export function CanvasOverlay({
 
       {/* ── Canvas tool buttons (grid snap + rulers) ─────────────────────── */}
       <div style={{
-        position: 'absolute', bottom: 12, right: 130,
+        position: 'absolute', bottom: 32, right: 130,
         display: 'flex', gap: 4, zIndex: 20, pointerEvents: 'all',
       }}>
         {/* Rulers toggle */}
@@ -3389,7 +3267,7 @@ export function CanvasOverlay({
       {/* ── Zoom controls (not transformed) ──────────────────────────────── */}
       <div style={{
         position: 'absolute',
-        bottom: 12,
+        bottom: 32, // above the 24px status bar + 8px gap
         right: 12,
         display: 'flex',
         alignItems: 'center',
@@ -4441,7 +4319,7 @@ function CanvasBgPicker({ color, onChange }: { color: string | null; onChange: (
   }, [open]);
 
   return (
-    <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20, pointerEvents: 'all' }}>
+    <div style={{ position: 'absolute', bottom: 32, left: '50%', transform: 'translateX(-50%)', zIndex: 20, pointerEvents: 'all' }}>
       {open && (
         <div
           onMouseDown={(e) => e.stopPropagation()}

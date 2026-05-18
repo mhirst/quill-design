@@ -320,9 +320,11 @@ function applyRotate(snap: Shape, _dx: number, _dy: number, currentX?: number, c
   const cy = snap.y + snap.height / 2;
 
   if (currentX !== undefined && currentY !== undefined && originX !== undefined && originY !== undefined) {
-    // Angle from shape center to current mouse position
-    const angle = Math.atan2(currentY - cy, currentX - cx) * (180 / Math.PI) + 90;
-    const rotation = ((angle) % 360 + 360) % 360;
+    // Delta angle from grab point to current point — no jump on first move
+    const startAngle = Math.atan2(originY - cy, originX - cx) * (180 / Math.PI);
+    const currentAngle = Math.atan2(currentY - cy, currentX - cx) * (180 / Math.PI);
+    const delta = currentAngle - startAngle;
+    const rotation = ((snap.rotation + delta) % 360 + 360) % 360;
     return { rotation };
   }
 
@@ -1330,6 +1332,12 @@ export function useDrawingTools(onShapesChange: (jsx: string, shapes: Shape[]) =
     // Exact bounding box from cubic bezier extremes
     const bb = pathBbox(pts, closed);
     shape.x = bb.x; shape.y = bb.y; shape.width = bb.width; shape.height = bb.height;
+    // Open paths render as strokes; closed paths render as filled shapes
+    if (!closed) {
+      shape.fill = 'transparent';
+      shape.stroke = '#e2e8f0';
+      shape.strokeWidth = 2;
+    }
     const next = [...shapes, shape];
     dispatch({ type: 'SET_SHAPES', shapes: next });
     dispatch({ type: 'SELECT', id: shape.id });

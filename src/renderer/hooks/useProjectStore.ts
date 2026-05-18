@@ -77,17 +77,37 @@ function localStorageWrite(data: unknown) {
   try { localStorage.setItem('quill-store', JSON.stringify(data)); } catch { /* ignore */ }
 }
 
-// Debounce writes to avoid hammering disk on every shape drag
+// Debounce writes to avoid hammering disk on every shape drag.
+// Keeps a pendingRef so beforeunload can flush synchronously.
 function useDebouncedWrite() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  return useCallback((store: StoreShape) => {
+  const pendingRef = useRef<StoreShape | null>(null);
+
+  const flush = useCallback(() => {
+    if (!pendingRef.current) return;
+    const api = getStoreApi();
+    if (api) api.storeWrite!(pendingRef.current);
+    else localStorageWrite(pendingRef.current);
+    pendingRef.current = null;
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+  }, []);
+
+  // Flush on tab close / navigate away (browser mode only)
+  useEffect(() => {
+    const handler = () => flush();
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [flush]);
+
+  const write = useCallback((store: StoreShape) => {
+    pendingRef.current = store;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      const api = getStoreApi();
-      if (api) api.storeWrite!(store);
-      else localStorageWrite(store);
+      flush();
     }, 800);
-  }, []);
+  }, [flush]);
+
+  return write;
 }
 
 export function useProjectStore() {
