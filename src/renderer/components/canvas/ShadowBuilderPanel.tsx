@@ -176,10 +176,10 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
   const [bgColor, setBgColor] = useState('#1e293b');
   const [shapeColor, setShapeColor] = useState('#334155');
 
-  if (!open) return null;
-
   const cssValue = useMemo(() => buildBoxShadowCSS(layers), [layers]);
   const fullCSS = useMemo(() => buildFullCSSRule(layers), [layers]);
+
+  if (!open) return null;
 
   const addLayer = () => {
     const newLayer = defaultLayer();
@@ -210,7 +210,7 @@ export function ShadowBuilderPanel({ open, onClose }: Props) {
   const selected = layers[selectedLayerIdx];
 
   const panel: React.CSSProperties = {
-    position: 'fixed', top: 60, right: 16, width: 370,
+    position: 'fixed', top: 60, right: 296, width: 370,
     background: '#1e1e2e', border: '1px solid #2a2a3e',
     borderRadius: 12, zIndex: 9019, display: 'flex', flexDirection: 'column',
     fontFamily: 'system-ui, sans-serif', color: '#e2e8f0',
