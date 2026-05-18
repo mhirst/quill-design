@@ -4,7 +4,9 @@
  * Shows: color palette, text styles, spacing values, shape type inventory.
  */
 import React, { useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import type { Shape } from '../../lib/shapes';
+import { ShapeTypeIcon } from '../ui/ShapeTypeIcon';
 
 interface Props {
   open: boolean;
@@ -194,15 +196,17 @@ export function DesignSystemPanel({ open, onClose, shapes, onApplyColor }: Props
             )}
             <button
               onClick={onClose}
+              title="Close"
               style={{
                 background: 'none', border: '1px solid transparent', cursor: 'pointer',
-                color: 'var(--muted)', padding: '4px 8px', borderRadius: 6, fontSize: 11,
+                color: 'var(--muted)', padding: 6, borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.1s',
               }}
               onMouseEnter={e => { e.currentTarget.style.background = 'var(--panel-alt)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = 'var(--muted)'; }}
             >
-              ✕ Close
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -303,8 +307,8 @@ export function DesignSystemPanel({ open, onClose, shapes, onApplyColor }: Props
                       borderRadius: 8, padding: '8px 12px',
                       display: 'flex', flexDirection: 'column', gap: 2,
                     }}>
-                      <span style={{ fontSize: 18, lineHeight: 1 }}>
-                        {type === 'frame' ? '⬜' : type === 'rectangle' ? '▬' : type === 'ellipse' ? '◯' : type === 'text' ? 'T' : '✏'}
+                      <span style={{ display: 'flex', color: 'var(--muted)' }}>
+                        <ShapeTypeIcon type={type} size={16} />
                       </span>
                       <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', lineHeight: 1.2 }}>{count}</span>
                       <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'capitalize' }}>{type}</span>

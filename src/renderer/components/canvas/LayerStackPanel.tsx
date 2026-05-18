@@ -22,6 +22,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import type { Shape } from '../../lib/shapes';
+import { ShapeTypeIcon } from '../ui/ShapeTypeIcon';
 
 // ─── Isometric Math ────────────────────────────────────────────────────────────
 
@@ -322,7 +323,7 @@ export function LayerStackPanel({ open, onClose, shapes, selectedShapeId, onSele
               style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 14px', background: isSelected ? '#1e1e4a' : isHov ? '#161628' : 'transparent', border: 'none', borderBottom: '1px solid #1a1a2e', cursor: 'pointer', textAlign: 'left' }}>
               <span style={{ fontSize: 10, color: '#444', width: 18, flexShrink: 0, textAlign: 'right' }}>{idx + 1}</span>
               <div style={{ width: 16, height: 16, borderRadius: 2, background: shape.fill ?? '#7b7bff', flexShrink: 0, border: '1px solid #2a2a4a', opacity: shape.opacity ?? 1 }} />
-              <span style={{ fontSize: 10, color: '#888', flexShrink: 0 }}>{shapeTypeIcon(shape.type)}</span>
+              <span style={{ color: '#888', flexShrink: 0, display: 'flex' }}><ShapeTypeIcon type={shape.type} size={11} /></span>
               <span style={{ flex: 1, fontSize: 11, color: isSelected ? '#e0e0ff' : '#c8c8e8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {shape.name}
               </span>

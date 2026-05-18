@@ -13,6 +13,7 @@
 
 import React, { useMemo, useState } from 'react';
 import type { Shape } from '../../lib/shapes';
+import { ShapeTypeIcon } from '../ui/ShapeTypeIcon';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -206,17 +207,6 @@ const CLOSE_BTN: React.CSSProperties = {
   lineHeight: 1,
 };
 
-const TYPE_ICONS: Record<string, string> = {
-  rect: '▭',
-  ellipse: '◯',
-  text: 'T',
-  frame: '⊡',
-  line: '—',
-  arrow: '→',
-  star: '★',
-  polygon: '⬡',
-  image: '⬚',
-};
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -351,13 +341,13 @@ export function ComponentAnalyzerPanel({ open, onClose, shapes, onSelectShapes }
                   height: 28,
                   borderRadius: 6,
                   background: '#3a1a1a',
+                  color: '#d4a8a8',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 14,
                   flexShrink: 0,
                 }}>
-                  {TYPE_ICONS[typeKey] ?? '□'}
+                  <ShapeTypeIcon type={typeKey === 'rect' ? 'rectangle' : typeKey} size={14} />
                 </div>
 
                 {/* Name + fingerprint */}

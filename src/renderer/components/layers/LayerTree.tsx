@@ -1,7 +1,8 @@
-import { ChevronRight, ChevronDown, Eye, EyeOff, Lock, Unlock, Focus, Frame, Square, Circle, Type, Pencil, Group } from 'lucide-react';
+import { ChevronRight, ChevronDown, Eye, EyeOff, Lock, Unlock, Focus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { LayerNode } from '../../hooks/useCanvas';
 import type { Shape } from '../../lib/shapes';
+import { ShapeTypeIcon } from '../ui/ShapeTypeIcon';
 
 // ── Mini shape preview rendered onto a small canvas ─────────────────────────
 function renderShapePreview(canvas: HTMLCanvasElement, shape: Shape, allShapes: Shape[]) {
@@ -271,17 +272,6 @@ function LayerNodeRow({ node, depth, selectedPath, onSelect }: NodeProps) {
 }
 
 // Shape type icons
-function ShapeTypeIcon({ shape, size = 12 }: { shape: Shape; size?: number }) {
-  if (shape.isGroup) return <Group size={size} />;
-  switch (shape.type) {
-    case 'frame': return <Frame size={size} />;
-    case 'rectangle': return <Square size={size} />;
-    case 'ellipse': return <Circle size={size} />;
-    case 'text': return <Type size={size} />;
-    case 'path': return <Pencil size={size} />;
-    default: return <Square size={size} />;
-  }
-}
 
 interface Props {
   layerTree: LayerNode | null;

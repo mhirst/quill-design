@@ -14,6 +14,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import type { Shape } from '../../lib/shapes';
+import { ShapeTypeIcon } from '../ui/ShapeTypeIcon';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -222,13 +223,6 @@ function NameDiff({ current, suggested }: { current: string; suggested: string }
 // ── Type Icon ──────────────────────────────────────────────────────────────────
 
 function TypeIcon({ type }: { type: Shape['type'] }) {
-  const icons: Record<string, string> = {
-    frame: '▣',
-    rectangle: '▬',
-    ellipse: '●',
-    text: 'T',
-    path: '⟋',
-  };
   const colors: Record<string, string> = {
     frame: '#818cf8',
     rectangle: '#60a5fa',
@@ -241,12 +235,10 @@ function TypeIcon({ type }: { type: Shape['type'] }) {
       width: 18, height: 18, borderRadius: 3,
       background: `${colors[type] ?? '#888'}22`,
       color: colors[type] ?? '#888',
-      fontSize: type === 'text' ? 10 : 9,
-      fontWeight: 700,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0,
     }}>
-      {icons[type] ?? '■'}
+      <ShapeTypeIcon type={type} size={11} />
     </span>
   );
 }

@@ -28,6 +28,7 @@
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import type { Shape } from '../../lib/shapes';
+import { ShapeTypeIcon } from '../ui/ShapeTypeIcon';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,10 +124,6 @@ function ShapeRow({ shape, selected, onToggle, onClick }: {
   shape: Shape; selected: boolean;
   onToggle: () => void; onClick: () => void;
 }) {
-  const ICON: Record<string, string> = {
-    rectangle: '▭', ellipse: '○', text: 'T', frame: '⬜', path: '✒',
-  };
-
   return (
     <div
       style={{
@@ -144,8 +141,8 @@ function ShapeRow({ shape, selected, onToggle, onClick }: {
         onClick={e => e.stopPropagation()}
         style={{ accentColor: '#818cf8', cursor: 'pointer', flexShrink: 0 }}
       />
-      <span style={{ fontSize: 9, color: 'var(--muted, #666)', flexShrink: 0, width: 12, textAlign: 'center' }}>
-        {ICON[shape.type] || '◻'}
+      <span style={{ color: 'var(--muted, #666)', flexShrink: 0, display: 'flex' }}>
+        <ShapeTypeIcon type={shape.type} size={10} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }} onClick={onClick}>
         <div style={{ fontSize: 10, color: 'var(--text, #e2e8f0)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

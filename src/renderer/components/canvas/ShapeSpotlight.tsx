@@ -5,19 +5,9 @@
  */
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import type { Shape } from '../../lib/shapes';
+import { ShapeTypeIcon } from '../ui/ShapeTypeIcon';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function shapeIcon(type: Shape['type']): string {
-  switch (type) {
-    case 'frame':     return '⬜';
-    case 'rectangle': return '▭';
-    case 'ellipse':   return '◯';
-    case 'text':      return 'T';
-    case 'path':      return '✒';
-    default:          return '□';
-  }
-}
 
 const TYPE_LABELS: Record<Shape['type'], string> = {
   frame: 'Frame', rectangle: 'Rect', ellipse: 'Ellipse', text: 'Text', path: 'Path',
@@ -297,10 +287,9 @@ export function ShapeSpotlight({ open, onClose, shapes, onSelect }: Props) {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isActive ? 'rgba(99,102,241,0.15)' : 'var(--panel-alt)',
                     border: '1px solid var(--border)',
-                    borderRadius: 6, fontSize: 11, color: isActive ? 'var(--accent)' : 'var(--muted)',
-                    fontWeight: 700,
+                    borderRadius: 6, color: isActive ? 'var(--accent)' : 'var(--muted)',
                   }}>
-                    {shapeIcon(shape.type)}
+                    <ShapeTypeIcon type={shape.type} size={13} />
                   </span>
 
                   {/* Name + preview */}
