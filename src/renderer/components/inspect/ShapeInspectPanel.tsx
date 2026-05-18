@@ -40,24 +40,46 @@ export function ShapeInspectPanel({ shape, onPreview, onChange, allShapes = [] }
   const isText = shape.type === 'text';
   const isFrame = shape.type === 'frame';
   const isPath = shape.type === 'path';
-  const [cssCopied, setCssCopied] = useState(false);
-  const [imgCopied, setImgCopied] = useState(false);
-  const [svgCopied, setSvgCopied] = useState(false);
+  const [copiedWhat, setCopiedWhat] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  // "More" section — auto-open if any rarely-used field has data
+  const hasMoreData = !!(
+    (shape.transitionDuration && shape.transitionDuration > 0) ||
+    shape.cssAnimation ||
+    (shape.notes && shape.notes.trim()) ||
+    (shape.tags && shape.tags.length > 0) ||
+    (shape.variants && Object.keys(shape.variants).length > 0)
+  );
+  const [moreOpen, setMoreOpen] = useState(hasMoreData);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
 
   const copyCss = useCallback(() => {
     const css = shapeToCss(shape);
     navigator.clipboard.writeText(css).then(() => {
-      setCssCopied(true);
-      setTimeout(() => setCssCopied(false), 1500);
+      setCopiedWhat('CSS');
+      setTimeout(() => setCopiedWhat(null), 1500);
     }).catch(() => {});
+    setExportOpen(false);
   }, [shape]);
 
   const copySvg = useCallback(() => {
     const svg = shapesToSvg([shape]);
     navigator.clipboard.writeText(svg).then(() => {
-      setSvgCopied(true);
-      setTimeout(() => setSvgCopied(false), 1500);
+      setCopiedWhat('SVG');
+      setTimeout(() => setCopiedWhat(null), 1500);
     }).catch(() => {});
+    setExportOpen(false);
   }, [shape]);
 
   const copyAsImage = useCallback(() => {
@@ -68,25 +90,26 @@ export function ShapeInspectPanel({ shape, onPreview, onChange, allShapes = [] }
         if (!blob) return;
         const item = new ClipboardItem({ 'image/png': blob });
         navigator.clipboard.write([item]).then(() => {
-          setImgCopied(true);
-          setTimeout(() => setImgCopied(false), 1500);
+          setCopiedWhat('PNG');
+          setTimeout(() => setCopiedWhat(null), 1500);
         }).catch(() => {});
       }, 'image/png');
     } catch {
       // shapesToCanvas may not support all shape types
     }
+    setExportOpen(false);
   }, [shape]);
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
-      background: 'var(--panel)', borderLeft: '1px solid var(--border)',
+      background: 'var(--panel)',
       fontSize: 12,
     }}>
       {/* Header */}
       <div style={{
-        height: 44, flexShrink: 0, display: 'flex', alignItems: 'center',
-        padding: '0 8px 0 12px', gap: 8, borderBottom: '1px solid var(--border)',
+        height: 40, flexShrink: 0, display: 'flex', alignItems: 'center',
+        padding: '0 6px 0 10px', gap: 6, borderBottom: '1px solid var(--border)',
       }}>
         <TypeBadge type={shape.type} />
         <NameInput
@@ -111,66 +134,64 @@ export function ShapeInspectPanel({ shape, onPreview, onChange, allShapes = [] }
         >
           <LockIcon locked={!!shape.locked} />
         </button>
-        {/* Copy as Image button */}
-        <button
-          onClick={copyAsImage}
-          title="Copy as PNG image"
-          style={{
-            flexShrink: 0, background: imgCopied ? 'rgba(99,102,241,0.15)' : 'none',
-            border: `1px solid ${imgCopied ? 'rgba(99,102,241,0.4)' : 'transparent'}`,
-            borderRadius: 5, color: imgCopied ? '#818cf8' : 'var(--muted)',
-            cursor: 'pointer', padding: '3px 5px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={(e) => { if (!imgCopied) { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--panel-alt)'; } }}
-          onMouseLeave={(e) => { if (!imgCopied) { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'none'; } }}
-        >
-          {imgCopied ? (
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 7l3 3 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          ) : (
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <rect x="1" y="3" width="8" height="7" rx="1.2" stroke="currentColor" strokeWidth="1.1"/>
-              <path d="M4 3V2.5A1.5 1.5 0 0 1 5.5 1h5A1.5 1.5 0 0 1 12 2.5v5A1.5 1.5 0 0 1 10.5 9H10" stroke="currentColor" strokeWidth="1.1"/>
-              <circle cx="4" cy="6.5" r="0.9" fill="currentColor"/>
-              <path d="M1 8.5l2-2 1.5 1.5 2-2.5L9 9" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+        {/* Export dropdown — single button instead of 3 separate ones */}
+        <div ref={exportRef} style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            onClick={() => setExportOpen(o => !o)}
+            title="Export / Copy"
+            style={{
+              flexShrink: 0, background: copiedWhat ? 'rgba(34,197,94,0.12)' : (exportOpen ? 'var(--panel-alt)' : 'none'),
+              border: `1px solid ${copiedWhat ? 'rgba(34,197,94,0.35)' : (exportOpen ? 'var(--border)' : 'transparent')}`,
+              borderRadius: 5, color: copiedWhat ? '#22c55e' : 'var(--muted)',
+              cursor: 'pointer', padding: '3px 6px',
+              display: 'flex', alignItems: 'center', gap: 3,
+              fontSize: 10, fontWeight: 600, fontFamily: 'monospace',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => { if (!copiedWhat) { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--panel-alt)'; } }}
+            onMouseLeave={(e) => { if (!copiedWhat) { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = exportOpen ? 'var(--border)' : 'transparent'; e.currentTarget.style.background = exportOpen ? 'var(--panel-alt)' : 'none'; } }}
+          >
+            {copiedWhat ? `✓ ${copiedWhat}` : (
+              <>
+                <svg width="11" height="11" viewBox="0 0 13 13" fill="none">
+                  <rect x="1" y="3" width="8" height="7" rx="1.2" stroke="currentColor" strokeWidth="1.1"/>
+                  <path d="M4 3V2.5A1.5 1.5 0 0 1 5.5 1h5A1.5 1.5 0 0 1 12 2.5v5A1.5 1.5 0 0 1 10.5 9H10" stroke="currentColor" strokeWidth="1.1"/>
+                </svg>
+                Copy
+              </>
+            )}
+          </button>
+          {exportOpen && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 4,
+              background: 'var(--panel)', border: '1px solid var(--border)',
+              borderRadius: 7, boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
+              minWidth: 130, zIndex: 9999, overflow: 'hidden',
+            }}>
+              {[
+                { label: 'Copy CSS', sublabel: '.css', action: copyCss },
+                { label: 'Copy SVG', sublabel: '<svg>', action: copySvg },
+                { label: 'Copy PNG', sublabel: 'image', action: copyAsImage },
+              ].map(item => (
+                <button
+                  key={item.label}
+                  onClick={item.action}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '7px 12px', background: 'none', border: 'none',
+                    cursor: 'pointer', fontSize: 12, color: 'var(--text)', textAlign: 'left',
+                    transition: 'background 0.08s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                >
+                  <span>{item.label}</span>
+                  <span style={{ fontSize: 10, color: 'var(--subtle)', fontFamily: 'monospace' }}>{item.sublabel}</span>
+                </button>
+              ))}
+            </div>
           )}
-        </button>
-        {/* Copy as SVG button */}
-        <button
-          onClick={copySvg}
-          title="Copy as SVG markup"
-          style={{
-            flexShrink: 0, background: svgCopied ? 'rgba(249,115,22,0.15)' : 'none',
-            border: `1px solid ${svgCopied ? 'rgba(249,115,22,0.4)' : 'transparent'}`,
-            borderRadius: 5, color: svgCopied ? '#f97316' : 'var(--muted)',
-            cursor: 'pointer', fontSize: 9, fontWeight: 700, fontFamily: 'monospace',
-            padding: '3px 6px', letterSpacing: '0.04em',
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={(e) => { if (!svgCopied) { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--panel-alt)'; } }}
-          onMouseLeave={(e) => { if (!svgCopied) { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'none'; } }}
-        >
-          {svgCopied ? '✓ SVG' : 'SVG'}
-        </button>
-        {/* Copy as CSS button */}
-        <button
-          onClick={copyCss}
-          title="Copy as CSS"
-          style={{
-            flexShrink: 0, background: cssCopied ? 'rgba(34,197,94,0.15)' : 'none',
-            border: `1px solid ${cssCopied ? 'rgba(34,197,94,0.4)' : 'transparent'}`,
-            borderRadius: 5, color: cssCopied ? '#22c55e' : 'var(--muted)',
-            cursor: 'pointer', fontSize: 9, fontWeight: 700, fontFamily: 'monospace',
-            padding: '3px 6px', letterSpacing: '0.04em',
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={(e) => { if (!cssCopied) { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--panel-alt)'; } }}
-          onMouseLeave={(e) => { if (!cssCopied) { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'none'; } }}
-        >
-          {cssCopied ? '✓ CSS' : '</> CSS'}
-        </button>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -242,44 +263,10 @@ export function ShapeInspectPanel({ shape, onPreview, onChange, allShapes = [] }
           </PanelSection>
         )}
 
-        {/* ── Appearance ── */}
-        <PanelSection label="Appearance">
-          {/* Opacity row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={labelSt}>Opacity</span>
-            <div style={{ flex: 1 }}>
-              <input
-                type="range" min={0} max={100}
-                value={Math.round(shape.opacity * 100)}
-                onChange={(e) => onPreview({ opacity: parseFloat(e.target.value) / 100 })}
-                onMouseUp={(e) => onChange({ opacity: parseFloat((e.target as HTMLInputElement).value) / 100 })}
-                style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
-              />
-            </div>
-            <span style={{ ...labelSt, width: 32, textAlign: 'right', fontFamily: 'monospace' }}>
-              {Math.round(shape.opacity * 100)}%
-            </span>
-          </div>
-
-          {/* Blend mode */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={labelSt}>Blend</span>
-            <select
-              value={shape.blendMode ?? 'normal'}
-              onChange={(e) => { onPreview({ blendMode: e.target.value }); onChange({ blendMode: e.target.value }); }}
-              onKeyDown={(e) => { const isUndo = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z'); if (!isUndo) e.stopPropagation(); }}
-              style={{ ...selectSt, flex: 1 }}
-            >
-              {[
-                'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
-                'color-dodge', 'color-burn', 'hard-light', 'soft-light',
-                'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
-              ].map(m => (
-                <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1).replace(/-/g, ' ')}</option>
-              ))}
-            </select>
-          </div>
-        </PanelSection>
+        {/* ── Typography (text shapes — top priority) ── */}
+        {isText && (
+          <TypographySection shape={shape} onPreview={onPreview} onChange={onChange} />
+        )}
 
         {/* ── Fill ── */}
         {!isText && !isPath && (
@@ -296,6 +283,9 @@ export function ShapeInspectPanel({ shape, onPreview, onChange, allShapes = [] }
           <PathSection shape={shape} onPreview={onPreview} onChange={onChange} />
         )}
 
+        {/* ── Appearance (opacity + blend) ── */}
+        <AppearanceSection shape={shape} onPreview={onPreview} onChange={onChange} />
+
         {/* ── Effects (shadow) ── */}
         {!isPath && (
           <ShadowSection shape={shape} onPreview={onPreview} onChange={onChange} />
@@ -304,11 +294,6 @@ export function ShapeInspectPanel({ shape, onPreview, onChange, allShapes = [] }
         {/* ── Filters ── */}
         {!isPath && (
           <FiltersSection shape={shape} onPreview={onPreview} onChange={onChange} />
-        )}
-
-        {/* ── Constraints ── */}
-        {shape.parentId && (
-          <ConstraintsSection shape={shape} onChange={onChange} />
         )}
 
         {/* ── Transform ── */}
@@ -321,6 +306,11 @@ export function ShapeInspectPanel({ shape, onPreview, onChange, allShapes = [] }
           <ShapeStylePresetsSection shape={shape} onPreview={onPreview} onChange={onChange} />
         )}
 
+        {/* ── Constraints ── */}
+        {shape.parentId && (
+          <ConstraintsSection shape={shape} onChange={onChange} />
+        )}
+
         {/* ── Clip Mask ── */}
         {!isPath && (
           <ClipMaskSection shape={shape} onChange={onChange} allShapes={allShapes} />
@@ -331,32 +321,157 @@ export function ShapeInspectPanel({ shape, onPreview, onChange, allShapes = [] }
           <IconOverlaySection shape={shape} onPreview={onPreview} onChange={onChange} />
         )}
 
-        {/* ── Typography ── */}
-        {isText && (
-          <TypographySection shape={shape} onPreview={onPreview} onChange={onChange} />
-        )}
-
-        {/* ── Transition / Animation ── */}
-        <TransitionSection shape={shape} onChange={onChange} />
-
-        {/* ── CSS Animation Presets ── */}
-        <CssAnimationSection shape={shape} onChange={onChange} />
-
-        {/* ── Notes / Annotations ── */}
-        <NotesSection shape={shape} onChange={onChange} />
-
-        {/* ── Shape Tags ── */}
-        <TagsSection shape={shape} onChange={onChange} />
-
-        {/* ── Shape Variants ── */}
-        <VariantsSection shape={shape} onChange={onChange} />
-
         {/* ── Prototype / Interactions ── */}
         <PrototypeSection shape={shape} onChange={onChange} allShapes={allShapes} />
 
         {/* ── CSS Code ── */}
         <CssCodeSection shape={shape} />
 
+        {/* ── More (rarely-used sections) ── */}
+        <div style={{ borderBottom: '1px solid var(--border)' }}>
+          <div
+            onClick={() => setMoreOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: moreOpen ? '8px 12px 5px' : '8px 12px',
+              cursor: 'pointer', minHeight: 37,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ flexShrink: 0, transition: 'transform 0.15s', transform: moreOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+                <path d="M1 2.5L4 5.5L7 2.5" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              <span style={sectionLabelSt}>More</span>
+            </div>
+            {hasMoreData && (
+              <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, letterSpacing: '0.04em', opacity: 0.8 }}>ACTIVE</span>
+            )}
+          </div>
+          {moreOpen && (
+            <>
+              <TransitionSection shape={shape} onChange={onChange} />
+              <CssAnimationSection shape={shape} onChange={onChange} />
+              <NotesSection shape={shape} onChange={onChange} />
+              <TagsSection shape={shape} onChange={onChange} />
+              <VariantsSection shape={shape} onChange={onChange} />
+            </>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── Appearance section (opacity + blend) ──────────────────────────────────────
+
+function AppearanceSection({ shape, onPreview, onChange }: {
+  shape: Shape;
+  onPreview: (p: Partial<Shape>) => void;
+  onChange: (p: Partial<Shape>) => void;
+}) {
+  const blendMode = shape.blendMode ?? 'normal';
+  const opacityPct = Math.round(shape.opacity * 100);
+  const [opacityInput, setOpacityInput] = useState(String(opacityPct));
+  const [opacityFocused, setOpacityFocused] = useState(false);
+
+  useEffect(() => {
+    if (!opacityFocused) setOpacityInput(String(Math.round(shape.opacity * 100)));
+  }, [shape.opacity, opacityFocused]);
+
+  const commitOpacity = (raw: string) => {
+    let n = parseInt(raw, 10);
+    if (isNaN(n)) n = opacityPct;
+    n = Math.max(0, Math.min(100, n));
+    setOpacityInput(String(n));
+    onChange({ opacity: n / 100 });
+  };
+
+  return (
+    <div style={{ borderBottom: '1px solid var(--border)', padding: '8px 12px 10px' }}>
+      {/* Header */}
+      <div style={{ marginBottom: 8 }}>
+        <span style={sectionLabelSt}>Appearance</span>
+      </div>
+
+      {/* Opacity + Blend row — inline labels to save vertical space */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        {/* Opacity: inline "Op" label + slider + numeric input */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: 'var(--subtle)',
+            flexShrink: 0, letterSpacing: '0.02em', userSelect: 'none',
+          }}>Op</span>
+          <div style={{ flex: 1 }}>
+            <input
+              type="range" min={0} max={100}
+              value={opacityPct}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value) / 100;
+                onPreview({ opacity: v });
+                setOpacityInput(String(Math.round(v * 100)));
+              }}
+              onMouseUp={(e) => onChange({ opacity: parseFloat((e.target as HTMLInputElement).value) / 100 })}
+              style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+            />
+          </div>
+          {/* Editable numeric field */}
+          <div style={{
+            width: 42, background: 'var(--input-bg)', border: `1px solid ${opacityFocused ? 'var(--accent)' : 'var(--border)'}`,
+            borderRadius: 4, display: 'flex', alignItems: 'center', overflow: 'hidden',
+            transition: 'border-color 0.1s', flexShrink: 0,
+          }}>
+            <input
+              type="number"
+              min={0} max={100}
+              value={opacityInput}
+              onChange={e => { setOpacityInput(e.target.value); const n = parseInt(e.target.value, 10); if (!isNaN(n)) onPreview({ opacity: Math.max(0, Math.min(100, n)) / 100 }); }}
+              onFocus={() => { setOpacityFocused(true); }}
+              onBlur={e => { setOpacityFocused(false); commitOpacity(e.target.value); }}
+              onKeyDown={e => {
+                const isUndo = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z');
+                if (!isUndo) e.stopPropagation();
+                if (e.key === 'Enter') { commitOpacity((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).blur(); }
+                if (e.key === 'ArrowUp') { e.preventDefault(); const n = Math.min(100, (parseInt(opacityInput, 10) || 0) + (e.shiftKey ? 10 : 1)); setOpacityInput(String(n)); onPreview({ opacity: n / 100 }); onChange({ opacity: n / 100 }); }
+                if (e.key === 'ArrowDown') { e.preventDefault(); const n = Math.max(0, (parseInt(opacityInput, 10) || 0) - (e.shiftKey ? 10 : 1)); setOpacityInput(String(n)); onPreview({ opacity: n / 100 }); onChange({ opacity: n / 100 }); }
+              }}
+              style={{
+                width: '100%', background: 'none', border: 'none', outline: 'none',
+                color: 'var(--text)', fontSize: 11, fontFamily: 'monospace',
+                padding: '3px 4px', textAlign: 'right',
+              }}
+            />
+            <span style={{ fontSize: 9, color: 'var(--muted)', paddingRight: 4, flexShrink: 0 }}>%</span>
+          </div>
+        </div>
+
+        {/* Blend mode: inline "Blend" prefix in border wrapper */}
+        <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, width: 108, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 5, overflow: 'hidden' }}>
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: 'var(--subtle)',
+            padding: '0 3px 0 6px', display: 'flex', alignItems: 'center',
+            userSelect: 'none', flexShrink: 0, letterSpacing: '0.02em',
+          }}>Blend</span>
+          <select
+            value={blendMode}
+            onChange={(e) => { onPreview({ blendMode: e.target.value }); onChange({ blendMode: e.target.value }); }}
+            onKeyDown={(e) => { const isUndo = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z'); if (!isUndo) e.stopPropagation(); }}
+            style={{
+              ...selectSt,
+              border: 'none', borderRadius: 0, flex: 1, minWidth: 0, paddingLeft: 2,
+              color: blendMode !== 'normal' ? 'var(--accent)' : undefined,
+              fontWeight: blendMode !== 'normal' ? 600 : undefined,
+            }}
+          >
+            {[
+              'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
+              'color-dodge', 'color-burn', 'hard-light', 'soft-light',
+              'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
+            ].map(m => (
+              <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1).replace(/-/g, ' ')}</option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );
@@ -640,12 +755,17 @@ function TypeBadge({ type }: { type: Shape['type'] }) {
   const icons: Record<Shape['type'], string> = {
     frame: '⬜', rectangle: '▬', ellipse: '◯', text: 'T', path: '✏',
   };
+  const labels: Record<Shape['type'], string> = {
+    frame: 'Frame', rectangle: 'Rect', ellipse: 'Ellipse', text: 'Text', path: 'Path',
+  };
   return (
     <span style={{
-      fontSize: 11, color: 'var(--muted)', fontWeight: 600,
+      fontSize: 10, color: 'var(--muted)', fontWeight: 600,
       textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0,
+      display: 'flex', alignItems: 'center', gap: 3,
     }}>
-      {icons[type] ?? '?'} {type}
+      <span style={{ fontSize: 12, lineHeight: 1 }}>{icons[type] ?? '?'}</span>
+      <span>{labels[type] ?? type}</span>
     </span>
   );
 }
@@ -663,11 +783,11 @@ function FillSection({ shape, onPreview, onChange, allShapes = [] }: { shape: Sh
   useEffect(() => { setImageUrlInput(shape.imageUrl ?? ''); }, [shape.imageUrl]);
 
   const FILL_TYPES: { id: FillType; label: string; title: string }[] = [
-    { id: 'solid', label: '■', title: 'Solid' },
-    { id: 'linear-gradient', label: '▦', title: 'Linear gradient' },
-    { id: 'radial-gradient', label: '◎', title: 'Radial gradient' },
-    { id: 'image', label: '🖼', title: 'Image fill' },
-    { id: 'pattern', label: '⊹', title: 'Pattern fill' },
+    { id: 'solid', label: 'Solid', title: 'Solid color' },
+    { id: 'linear-gradient', label: 'Linear', title: 'Linear gradient' },
+    { id: 'radial-gradient', label: 'Radial', title: 'Radial gradient' },
+    { id: 'image', label: 'Image', title: 'Image fill' },
+    { id: 'pattern', label: 'Pattern', title: 'Pattern fill' },
   ];
 
   return (
@@ -689,9 +809,11 @@ function FillSection({ shape, onPreview, onChange, allShapes = [] }: { shape: Sh
                   flex: 1, height: 22, borderRadius: 4, border: 'none', cursor: 'pointer',
                   background: fillType === ft.id ? 'var(--panel)' : 'none',
                   color: fillType === ft.id ? 'var(--text)' : 'var(--muted)',
-                  fontSize: 13, fontWeight: fillType === ft.id ? 700 : 400,
+                  fontSize: 9, fontWeight: fillType === ft.id ? 700 : 500,
+                  letterSpacing: '0.02em',
                   boxShadow: fillType === ft.id ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
-                  transition: 'all 0.1s',
+                  transition: 'all 0.1s', whiteSpace: 'nowrap',
+                  padding: '0 2px',
                 }}
               >
                 {ft.label}
@@ -710,18 +832,7 @@ function FillSection({ shape, onPreview, onChange, allShapes = [] }: { shape: Sh
                 onOpacityPreview={(v) => onPreview({ fillOpacity: v / 100 })}
                 onOpacityCommit={(v) => onChange({ fillOpacity: v / 100 })}
               />
-              {/* Document colors */}
-              <DocColors
-                shapes={allShapes}
-                onPick={(c) => { onPreview({ fill: c }); onChange({ fill: c }); }}
-              />
-              {/* Color harmony suggestions */}
-              {/^#[0-9a-fA-F]{6}$/.test(shape.fill) && shape.fill !== 'transparent' && (
-                <ColorHarmony
-                  baseColor={shape.fill}
-                  onPick={(c) => { onPreview({ fill: c }); onChange({ fill: c }); }}
-                />
-              )}
+              {/* Document colors shown via palette grid toggle instead */}
             </>
           )}
 
@@ -1302,139 +1413,167 @@ function StrokeSection({ shape, onPreview, onChange }: { shape: Shape; onPreview
 
 function PathSection({ shape, onPreview, onChange }: { shape: Shape; onPreview: (p: Partial<Shape>) => void; onChange: (p: Partial<Shape>) => void }) {
   const hasStroke = shape.stroke !== 'transparent' && (shape.strokeWidth ?? 0) > 0;
+  const hasFill = shape.fill !== 'transparent';
+
+  const iconBtnSt = (active: boolean): React.CSSProperties => ({
+    height: 26, flex: 1, borderRadius: 5, border: '1px solid',
+    borderColor: active ? 'var(--accent)' : 'var(--border)',
+    background: active ? 'var(--accent-dim)' : 'transparent',
+    color: active ? 'var(--accent)' : 'var(--muted)',
+    cursor: 'pointer', fontSize: 11, fontWeight: 600, display: 'flex',
+    alignItems: 'center', justifyContent: 'center',
+  });
 
   return (
     <CollapsibleSection label="Path Style">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        {/* Stroke color + width */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ ...labelSt, marginBottom: 2 }}>Stroke</span>
-          <ColorRow
-            color={shape.stroke === 'transparent' ? '#6366f1' : shape.stroke}
-            opacity={100}
-            onColorPreview={(v) => onPreview({ stroke: v })}
-            onColorCommit={(v) => onChange({ stroke: v })}
-          />
-          {hasStroke && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={labelSt}>Width</span>
-              <FieldBox label="" value={shape.strokeWidth ?? 2} min={1}
-                onPreview={(v) => onPreview({ strokeWidth: v })}
-                onCommit={(v) => onChange({ strokeWidth: v })} />
-              <span style={labelSt}>px</span>
-            </div>
+        {/* Fill row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ ...labelSt, width: 36, flexShrink: 0 }}>Fill</span>
+          {hasFill ? (
+            <>
+              <ColorSwatchInput
+                value={shape.fill === 'transparent' ? '#e2e8f0' : shape.fill}
+                onPreview={(v) => onPreview({ fill: v })}
+                onCommit={(v) => onChange({ fill: v })}
+              />
+              <input
+                type="text"
+                value={shape.fill === 'transparent' ? '#e2e8f0' : shape.fill}
+                onChange={(e) => { const v = e.target.value.startsWith('#') ? e.target.value : '#' + e.target.value; if (/^#[0-9a-fA-F]{6}$/.test(v)) onPreview({ fill: v }); }}
+                onBlur={(e) => { const v = e.target.value.startsWith('#') ? e.target.value : '#' + e.target.value; if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange({ fill: v }); }}
+                onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                style={{ ...inputSt, flex: 1, fontFamily: 'monospace', textTransform: 'uppercase', minWidth: 0 }}
+              />
+              <button onClick={() => onChange({ fill: 'transparent' })} title="Remove fill"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--error, #ef4444)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+              >−</button>
+            </>
+          ) : (
+            <button onClick={() => onChange({ fill: '#e2e8f0' })} title="Add fill"
+              style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: '1px dashed var(--border)', borderRadius: 5, padding: '3px 10px', cursor: 'pointer', flex: 1 }}>
+              + Add fill
+            </button>
           )}
         </div>
 
-        {/* Dash pattern */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={labelSt}>Dash</span>
-          <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-            {(['solid', 'dashed', 'dotted'] as const).map(d => (
-              <button
-                key={d}
-                onClick={() => { onPreview({ strokeDash: d }); onChange({ strokeDash: d }); }}
-                title={d.charAt(0).toUpperCase() + d.slice(1)}
-                style={{
-                  flex: 1, height: 26, borderRadius: 5,
-                  border: '1px solid',
-                  borderColor: (shape.strokeDash ?? 'solid') === d ? 'var(--accent)' : 'var(--border)',
-                  background: (shape.strokeDash ?? 'solid') === d ? 'var(--accent-dim)' : 'transparent',
-                  color: (shape.strokeDash ?? 'solid') === d ? 'var(--accent)' : 'var(--muted)',
-                  cursor: 'pointer', fontSize: 10, fontWeight: 600,
-                }}
-              >
-                {d === 'solid' ? '——' : d === 'dashed' ? '- - -' : '· · ·'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Cap style */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={labelSt}>Cap</span>
-          <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-            {(['butt', 'round', 'square'] as const).map(c => (
-              <button
-                key={c}
-                onClick={() => { onPreview({ lineCap: c }); onChange({ lineCap: c }); }}
-                title={c.charAt(0).toUpperCase() + c.slice(1)}
-                style={{
-                  flex: 1, height: 26, borderRadius: 5,
-                  border: '1px solid',
-                  borderColor: (shape.lineCap ?? 'round') === c ? 'var(--accent)' : 'var(--border)',
-                  background: (shape.lineCap ?? 'round') === c ? 'var(--accent-dim)' : 'transparent',
-                  color: (shape.lineCap ?? 'round') === c ? 'var(--accent)' : 'var(--muted)',
-                  cursor: 'pointer', fontSize: 10, fontWeight: 600,
-                }}
-              >
-                {c === 'butt' ? '|' : c === 'round' ? '(' : '⊓'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Join style */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={labelSt}>Join</span>
-          <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-            {(['miter', 'round', 'bevel'] as const).map(j => (
-              <button
-                key={j}
-                onClick={() => { onPreview({ lineJoin: j }); onChange({ lineJoin: j }); }}
-                title={j.charAt(0).toUpperCase() + j.slice(1)}
-                style={{
-                  flex: 1, height: 26, borderRadius: 5,
-                  border: '1px solid',
-                  borderColor: (shape.lineJoin ?? 'round') === j ? 'var(--accent)' : 'var(--border)',
-                  background: (shape.lineJoin ?? 'round') === j ? 'var(--accent-dim)' : 'transparent',
-                  color: (shape.lineJoin ?? 'round') === j ? 'var(--accent)' : 'var(--muted)',
-                  cursor: 'pointer', fontSize: 10, fontWeight: 600,
-                }}
-              >
-                {j === 'miter' ? '∧' : j === 'round' ? '⌒' : '⊿'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Close path */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={shape.pathClosed ?? false}
-            onChange={(e) => { onPreview({ pathClosed: e.target.checked }); onChange({ pathClosed: e.target.checked }); }}
-            style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
-          />
-          <span style={labelSt}>Close path</span>
-        </label>
-
-        {/* Arrows */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flex: 1 }}>
-            <input
-              type="checkbox"
-              checked={shape.arrowStart ?? false}
-              onChange={(e) => { onPreview({ arrowStart: e.target.checked }); onChange({ arrowStart: e.target.checked }); }}
-              style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+        {/* Stroke row */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ ...labelSt, width: 36, flexShrink: 0 }}>Stroke</span>
+            <ColorSwatchInput
+              value={shape.stroke === 'transparent' ? '#6366f1' : shape.stroke}
+              onPreview={(v) => onPreview({ stroke: v })}
+              onCommit={(v) => onChange({ stroke: v })}
             />
-            <span style={labelSt}>← Start</span>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flex: 1 }}>
             <input
-              type="checkbox"
-              checked={shape.arrowEnd ?? false}
-              onChange={(e) => { onPreview({ arrowEnd: e.target.checked }); onChange({ arrowEnd: e.target.checked }); }}
-              style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+              type="text"
+              value={shape.stroke === 'transparent' ? '#6366f1' : shape.stroke}
+              onChange={(e) => { const v = e.target.value.startsWith('#') ? e.target.value : '#' + e.target.value; if (/^#[0-9a-fA-F]{6}$/.test(v)) onPreview({ stroke: v }); }}
+              onBlur={(e) => { const v = e.target.value.startsWith('#') ? e.target.value : '#' + e.target.value; if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange({ stroke: v }); }}
+              onKeyDown={(e) => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+              style={{ ...inputSt, flex: 1, fontFamily: 'monospace', textTransform: 'uppercase', minWidth: 0 }}
             />
-            <span style={labelSt}>End →</span>
-          </label>
+            <FieldBox label="" value={shape.strokeWidth ?? 2} min={0.5}
+              onPreview={(v) => onPreview({ strokeWidth: v })}
+              onCommit={(v) => onChange({ strokeWidth: v })} />
+            <span style={labelSt}>px</span>
+          </div>
+
+          {/* Dash / Cap / Join — compact single row each */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ ...labelSt, width: 36, flexShrink: 0 }}>Dash</span>
+            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+              {([
+                { v: 'solid', label: '—', title: 'Solid' },
+                { v: 'dashed', label: '- -', title: 'Dashed' },
+                { v: 'dotted', label: '···', title: 'Dotted' },
+              ] as const).map(({ v, label, title }) => (
+                <button key={v} title={title}
+                  onClick={() => { onPreview({ strokeDash: v }); onChange({ strokeDash: v }); }}
+                  style={iconBtnSt((shape.strokeDash ?? 'solid') === v)}
+                >{label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ ...labelSt, width: 36, flexShrink: 0 }}>Cap</span>
+            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+              {([
+                { v: 'butt', title: 'Butt' },
+                { v: 'round', title: 'Round' },
+                { v: 'square', title: 'Square' },
+              ] as const).map(({ v, title }) => (
+                <button key={v} title={title}
+                  onClick={() => { onPreview({ lineCap: v }); onChange({ lineCap: v }); }}
+                  style={iconBtnSt((shape.lineCap ?? 'round') === v)}
+                >
+                  <svg width="20" height="10" viewBox="0 0 20 10" fill="none">
+                    <line x1={v === 'butt' ? 10 : v === 'square' ? 8 : 10} y1="5" x2={v === 'butt' ? 10 : v === 'square' ? 12 : 10} y2="5"
+                      stroke="currentColor" strokeWidth="6"
+                      strokeLinecap={v}
+                    />
+                    <line x1="1" y1="5" x2="19" y2="5" stroke="currentColor" strokeWidth="0.5" opacity="0.3"/>
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ ...labelSt, width: 36, flexShrink: 0 }}>Join</span>
+            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+              {([
+                { v: 'miter', title: 'Miter' },
+                { v: 'round', title: 'Round' },
+                { v: 'bevel', title: 'Bevel' },
+              ] as const).map(({ v, title }) => (
+                <button key={v} title={title}
+                  onClick={() => { onPreview({ lineJoin: v }); onChange({ lineJoin: v }); }}
+                  style={iconBtnSt((shape.lineJoin ?? 'round') === v)}
+                >
+                  <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                    {v === 'miter' && <polyline points="2,12 9,2 16,12" stroke="currentColor" strokeWidth="2" strokeLinejoin="miter" fill="none"/>}
+                    {v === 'round' && <polyline points="2,12 9,2 16,12" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" fill="none"/>}
+                    {v === 'bevel' && <polyline points="2,12 9,2 16,12" stroke="currentColor" strokeWidth="2" strokeLinejoin="bevel" fill="none"/>}
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Point count info */}
-        <div style={{ color: 'var(--muted)', fontSize: 11 }}>
-          {(shape.points ?? []).length} point{(shape.points ?? []).length !== 1 ? 's' : ''}
+        {/* Close path + arrows — compact toggle row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={() => { onPreview({ pathClosed: !shape.pathClosed }); onChange({ pathClosed: !shape.pathClosed }); }}
+            title="Close path"
+            style={iconBtnSt(!!(shape.pathClosed))}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4">
+              <path d="M2 7 Q2 2 7 2 Q12 2 12 7 Q12 12 7 12 Q2 12 2 7" strokeDasharray={shape.pathClosed ? 'none' : '2 1.5'}/>
+            </svg>
+            <span style={{ marginLeft: 4, fontSize: 10 }}>Close</span>
+          </button>
+          <button
+            onClick={() => { onPreview({ arrowStart: !shape.arrowStart }); onChange({ arrowStart: !shape.arrowStart }); }}
+            title="Arrow at start"
+            style={iconBtnSt(!!(shape.arrowStart))}
+          >← Start</button>
+          <button
+            onClick={() => { onPreview({ arrowEnd: !shape.arrowEnd }); onChange({ arrowEnd: !shape.arrowEnd }); }}
+            title="Arrow at end"
+            style={iconBtnSt(!!(shape.arrowEnd))}
+          >End →</button>
+        </div>
+
+        {/* Point count — subtle */}
+        <div style={{ color: 'var(--subtle)', fontSize: 10, fontFamily: 'monospace' }}>
+          {(shape.points ?? []).length} pts
         </div>
 
       </div>
@@ -1574,9 +1713,11 @@ function ShadowSection({ shape, onPreview, onChange }: { shape: Shape; onPreview
       onRemove={shadows.length > 0 ? () => updateShadows([]) : undefined}
     >
       {/* Shadow presets */}
-      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
+      <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 4 }}>
         {SHADOW_PRESETS.map(({ label, title, shadows: presetShadows }) => {
           const isNone = presetShadows.length === 0;
+          // Hide "None" when there are no shadows to remove
+          if (isNone && shadows.length === 0) return null;
           return (
             <button
               key={label}
@@ -1585,34 +1726,21 @@ function ShadowSection({ shape, onPreview, onChange }: { shape: Shape; onPreview
               style={{
                 background: 'var(--panel-alt)', border: '1px solid var(--border)',
                 borderRadius: 4, cursor: 'pointer',
-                fontSize: 9, fontWeight: 600, padding: '3px 7px',
-                color: isNone ? 'var(--error)' : 'var(--muted)',
+                fontSize: 9, fontWeight: 600, padding: '3px 6px',
+                color: 'var(--muted)',
                 transition: 'all 0.1s',
-                position: 'relative',
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.borderColor = isNone ? 'rgba(239,68,68,0.4)' : 'var(--accent)';
-                e.currentTarget.style.color = isNone ? 'var(--error)' : 'var(--accent)';
+                e.currentTarget.style.color = isNone ? '#ef4444' : 'var(--accent)';
                 e.currentTarget.style.background = isNone ? 'rgba(239,68,68,0.08)' : 'var(--accent-dim)';
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.borderColor = 'var(--border)';
-                e.currentTarget.style.color = isNone ? 'var(--error)' : 'var(--muted)';
+                e.currentTarget.style.color = 'var(--muted)';
                 e.currentTarget.style.background = 'var(--panel-alt)';
               }}
             >
-              {/* Mini shadow preview box */}
-              {!isNone && (
-                <span style={{
-                  display: 'inline-block',
-                  width: 8, height: 8,
-                  background: 'rgba(150,150,200,0.4)',
-                  borderRadius: 2,
-                  boxShadow: presetShadows.map(s => `${s.x}px ${s.y}px ${s.blur}px ${s.color}`).join(', '),
-                  marginRight: 4,
-                  verticalAlign: 'middle',
-                }} />
-              )}
               {label}
             </button>
           );
@@ -2550,6 +2678,7 @@ function TagsSection({ shape, onChange }: {
   onChange: (patch: Partial<Shape>) => void;
 }) {
   const tags = shape.tags ?? [];
+  const [expanded, setExpanded] = useState(false);
   const [inputVal, setInputVal] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -2567,99 +2696,91 @@ function TagsSection({ shape, onChange }: {
   const suggestions = SUGGESTED_TAGS.filter(t => !tags.includes(t) && (inputVal === '' || t.startsWith(inputVal.toLowerCase())));
 
   return (
-    <div style={{ borderBottom: '1px solid var(--border)', padding: '8px 12px 10px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="var(--muted)" strokeWidth="1.4" strokeLinecap="round">
-          <path d="M1 8L6 13L13 6L8 1L2 1L1 2L1 8Z"/>
-          <circle cx="4.5" cy="4.5" r="1" fill="var(--muted)" stroke="none"/>
+    <div style={{ borderBottom: '1px solid var(--border)' }}>
+      {/* Collapsible header */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 12px 8px', color: 'var(--text)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="var(--muted)" strokeWidth="1.4" strokeLinecap="round">
+            <path d="M1 8L6 13L13 6L8 1L2 1L1 2L1 8Z"/>
+            <circle cx="4.5" cy="4.5" r="1" fill="var(--muted)" stroke="none"/>
+          </svg>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tags</span>
+          {tags.length > 0 && (
+            <span style={{ fontSize: 9, background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', borderRadius: 3, padding: '1px 4px', fontWeight: 600 }}>
+              {tags.length}
+            </span>
+          )}
+        </div>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--muted)" strokeWidth="1.5">
+          <path d={expanded ? 'M2 7L5 4L8 7' : 'M2 3L5 6L8 3'} />
         </svg>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          Tags
-        </span>
-        {tags.length > 0 && (
-          <span style={{ fontSize: 9, background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', borderRadius: 3, padding: '1px 4px', fontWeight: 600 }}>
-            {tags.length}
-          </span>
-        )}
-      </div>
+      </button>
 
-      {/* Tag chips */}
-      {tags.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-          {tags.map(tag => (
-            <div
-              key={tag}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 3,
-                background: 'rgba(99,102,241,0.1)',
-                border: '1px solid rgba(99,102,241,0.3)',
-                borderRadius: 4, padding: '2px 6px',
-                fontSize: 10, color: 'var(--accent)',
-              }}
-            >
-              <span>#{tag}</span>
-              <button
-                onClick={() => removeTag(tag)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(99,102,241,0.6)', padding: 0, fontSize: 10, lineHeight: 1, display: 'flex' }}
-              >
-                ✕
-              </button>
+      {expanded && (
+        <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {/* Tag chips */}
+          {tags.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {tags.map(tag => (
+                <div key={tag} style={{
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)',
+                  borderRadius: 4, padding: '2px 6px', fontSize: 10, color: 'var(--accent)',
+                }}>
+                  <span>#{tag}</span>
+                  <button onClick={() => removeTag(tag)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(99,102,241,0.6)', padding: 0, fontSize: 10, lineHeight: 1, display: 'flex' }}>✕</button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          {/* Input */}
+          <div style={{ position: 'relative' }}>
+            <input
+              value={inputVal}
+              onChange={e => setInputVal(e.target.value)}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onKeyDown={e => {
+                e.stopPropagation();
+                if (e.key === 'Enter' && inputVal.trim()) { addTag(inputVal); }
+                if (e.key === 'Backspace' && !inputVal && tags.length > 0) { removeTag(tags[tags.length - 1]); }
+                if (e.key === 'Escape') { setInputVal(''); setShowSuggestions(false); }
+              }}
+              placeholder="Add tag (press Enter)…"
+              style={{
+                width: '100%', background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5,
+                color: 'var(--text)', fontSize: 11, padding: '4px 8px', outline: 'none', boxSizing: 'border-box',
+              }}
+              onFocusCapture={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+              onBlurCapture={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 3,
+                background: 'var(--panel-alt)', border: '1px solid var(--border)',
+                borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 100, maxHeight: 120, overflowY: 'auto',
+              }}>
+                {suggestions.slice(0, 8).map(t => (
+                  <button key={t} onMouseDown={(e) => { e.preventDefault(); addTag(t); }}
+                    style={{ display: 'block', width: '100%', padding: '4px 8px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--muted)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.color = 'var(--accent)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--muted)'; }}
+                  >#{t}</button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
-
-      {/* Input */}
-      <div style={{ position: 'relative' }}>
-        <input
-          value={inputVal}
-          onChange={e => setInputVal(e.target.value)}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          onKeyDown={e => {
-            e.stopPropagation();
-            if (e.key === 'Enter' && inputVal.trim()) { addTag(inputVal); }
-            if (e.key === 'Backspace' && !inputVal && tags.length > 0) { removeTag(tags[tags.length - 1]); }
-            if (e.key === 'Escape') { setInputVal(''); setShowSuggestions(false); }
-          }}
-          placeholder="Add tag (press Enter)…"
-          style={{
-            width: '100%', background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5,
-            color: 'var(--text)', fontSize: 11, padding: '4px 8px', outline: 'none',
-            boxSizing: 'border-box',
-          }}
-          onFocusCapture={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
-          onBlurCapture={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-        />
-
-        {/* Suggestions dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div style={{
-            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 3,
-            background: 'var(--panel-alt)', border: '1px solid var(--border)',
-            borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-            zIndex: 100, maxHeight: 120, overflowY: 'auto',
-          }}>
-            {suggestions.slice(0, 8).map(t => (
-              <button
-                key={t}
-                onMouseDown={(e) => { e.preventDefault(); addTag(t); }}
-                style={{
-                  display: 'block', width: '100%', padding: '4px 8px', textAlign: 'left',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 11, color: 'var(--muted)',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.color = 'var(--accent)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--muted)'; }}
-              >
-                #{t}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -2788,6 +2909,7 @@ function VariantsSection({ shape, onChange }: {
 }) {
   const variants = shape.variants ?? {};
   const activeVariant = shape.activeVariant ?? 'Default';
+  const hasVariants = Object.keys(variants).length > 0;
   const [newName, setNewName] = useState('');
   const [showAdd, setShowAdd] = useState(false);
 
@@ -2901,25 +3023,34 @@ function VariantsSection({ shape, onChange }: {
 
   const variantNames = ['Default', ...Object.keys(variants).filter(k => k !== 'Default')];
 
+  const [varExpanded, setVarExpanded] = useState(hasVariants);
+
   return (
-    <div style={{ borderBottom: '1px solid var(--border)', padding: '8px 12px 10px' }}>
+    <div style={{ borderBottom: '1px solid var(--border)' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round">
-          <rect x="1" y="1" width="5" height="5" rx="1"/>
-          <rect x="8" y="1" width="5" height="5" rx="1"/>
-          <rect x="1" y="8" width="5" height="5" rx="1"/>
-          <rect x="8" y="8" width="5" height="5" rx="1" opacity="0.4"/>
+      <button
+        onClick={() => setVarExpanded(e => !e)}
+        style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px 8px', color: 'var(--text)' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round">
+            <rect x="1" y="1" width="5" height="5" rx="1"/>
+            <rect x="8" y="1" width="5" height="5" rx="1"/>
+            <rect x="1" y="8" width="5" height="5" rx="1"/>
+            <rect x="8" y="8" width="5" height="5" rx="1" opacity="0.4"/>
+          </svg>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Variants</span>
+          {hasVariants && (
+            <span style={{ fontSize: 9, background: 'rgba(168,85,247,0.12)', color: '#a855f7', borderRadius: 3, padding: '1px 4px', fontWeight: 600 }}>
+              {Object.keys(variants).length + 1}
+            </span>
+          )}
+        </div>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--muted)" strokeWidth="1.5">
+          <path d={varExpanded ? 'M2 7L5 4L8 7' : 'M2 3L5 6L8 3'} />
         </svg>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          Variants
-        </span>
-        {Object.keys(variants).length > 0 && (
-          <span style={{ fontSize: 9, background: 'rgba(168,85,247,0.12)', color: '#a855f7', borderRadius: 3, padding: '1px 4px', fontWeight: 600 }}>
-            {Object.keys(variants).length + 1}
-          </span>
-        )}
-      </div>
+      </button>
+      {varExpanded && <div style={{ padding: '0 12px 10px' }}>
 
       {/* Variant pills */}
       {variantNames.length > 1 && (
@@ -3058,6 +3189,7 @@ function VariantsSection({ shape, onChange }: {
           ))}
         </div>
       )}
+      </div>}
     </div>
   );
 }
@@ -3083,6 +3215,7 @@ function FiltersSection({ shape, onPreview, onChange }: {
   return (
     <CollapsibleSection
       label="Filters"
+      startCollapsed={!hasFilters}
       onAdd={!hasFilters ? () => { onPreview({ filterBlur: 4 }); onChange({ filterBlur: 4 }); } : undefined}
       onRemove={hasFilters ? () => {
         const reset = { filterBlur: 0, filterBrightness: 100, filterContrast: 100, filterSaturate: 100, filterBackdropBlur: 0, noiseOpacity: 0, filterGrayscale: 0, filterSepia: 0, filterHueRotate: 0, filterInvert: 0 };
@@ -3108,7 +3241,7 @@ function FiltersSection({ shape, onPreview, onChange }: {
             title={title}
             style={{
               background: 'var(--panel-alt)', border: '1px solid var(--border)',
-              borderRadius: 4, color: label === 'Clear' ? 'var(--error)' : 'var(--muted)', cursor: 'pointer',
+              borderRadius: 4, color: 'var(--muted)', cursor: 'pointer',
               fontSize: 9, fontWeight: 600, padding: '3px 7px',
               transition: 'all 0.1s',
             }}
@@ -3119,7 +3252,7 @@ function FiltersSection({ shape, onPreview, onChange }: {
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = 'var(--border)';
-              e.currentTarget.style.color = label === 'Clear' ? 'var(--error)' : 'var(--muted)';
+              e.currentTarget.style.color = 'var(--muted)';
               e.currentTarget.style.background = 'var(--panel-alt)';
             }}
           >
@@ -3284,6 +3417,7 @@ function TransformSection({ shape, onPreview, onChange }: {
   return (
     <CollapsibleSection
       label="Transform"
+      startCollapsed={!hasTransform}
       onAdd={!hasTransform ? () => { onPreview({ skewX: 10 }); onChange({ skewX: 10 }); } : undefined}
       onRemove={hasTransform ? clearAll : undefined}
     >
@@ -3317,7 +3451,7 @@ function TransformSection({ shape, onPreview, onChange }: {
             title={title}
             style={{
               background: 'var(--panel-alt)', border: '1px solid var(--border)',
-              borderRadius: 4, color: label === 'Clear' ? 'var(--error)' : 'var(--muted)', cursor: 'pointer',
+              borderRadius: 4, color: 'var(--muted)', cursor: 'pointer',
               fontSize: 9, fontWeight: 600, padding: '3px 7px', transition: 'all 0.1s',
             }}
             onMouseEnter={e => {
@@ -3327,7 +3461,7 @@ function TransformSection({ shape, onPreview, onChange }: {
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = 'var(--border)';
-              e.currentTarget.style.color = label === 'Clear' ? 'var(--error)' : 'var(--muted)';
+              e.currentTarget.style.color = 'var(--muted)';
               e.currentTarget.style.background = 'var(--panel-alt)';
             }}
           >
@@ -3633,6 +3767,7 @@ function ShapeStylePresetsSection({ shape, onPreview, onChange }: {
   const [nameInput, setNameInput] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(true);
 
   const allPresets = [...BUILTIN_PRESETS, ...saved];
 
@@ -3673,13 +3808,21 @@ function ShapeStylePresetsSection({ shape, onPreview, onChange }: {
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
       {/* Section header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 12px 8px',
-      }}>
-        <span style={sectionLabelSt}>Style Presets</span>
+      <div
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 12px 8px', cursor: 'pointer',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" style={{ flexShrink: 0, transition: 'transform 0.15s', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+            <path d="M1 2.5L4 5.5L7 2.5" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <span style={sectionLabelSt}>Style Presets</span>
+        </div>
         <button
-          onClick={startSave}
+          onClick={(e) => { e.stopPropagation(); startSave(); }}
           title="Save current style as preset"
           style={{
             background: 'none', border: '1px solid transparent', cursor: 'pointer',
@@ -3692,7 +3835,7 @@ function ShapeStylePresetsSection({ shape, onPreview, onChange }: {
         >+</button>
       </div>
 
-      <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {!collapsed && <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
 
         {/* Save-as-preset row */}
         {saving && (
@@ -3793,7 +3936,7 @@ function ShapeStylePresetsSection({ shape, onPreview, onChange }: {
             No presets yet. Click + to save current style.
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -3862,48 +4005,80 @@ function SavedTextStylesRow({ shape, onApply }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {/* Saved styles list */}
-      {styles.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-          {styles.map(s => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <button
-                onClick={() => onApply({
-                  fontFamily: s.fontFamily, fontSize: s.fontSize,
-                  fontWeight: s.fontWeight, fontStyle: s.fontStyle,
-                  letterSpacing: s.letterSpacing, lineHeight: s.lineHeight,
-                  color: s.color,
-                })}
-                title={`${s.fontFamily} ${s.fontSize}px / ${s.fontWeight}`}
-                style={{
-                  background: 'var(--panel-alt)', border: '1px solid var(--border)',
-                  borderRadius: '4px 0 0 4px', color: 'var(--text)', cursor: 'pointer',
-                  fontSize: 10, fontWeight: 600, padding: '3px 7px',
-                  fontFamily: s.fontFamily, transition: 'all 0.1s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text)'; }}
-              >
-                {s.name}
-              </button>
-              <button
-                onClick={() => handleDelete(s.id)}
-                title="Delete style"
-                style={{
-                  background: 'var(--panel-alt)', border: '1px solid var(--border)', borderLeft: 'none',
-                  borderRadius: '0 4px 4px 0', color: 'var(--muted)', cursor: 'pointer',
-                  fontSize: 9, padding: '3px 5px', transition: 'all 0.1s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.color = 'var(--error)'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--panel-alt)'; }}
-              >✕</button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Preset chips + saved style chips + save button — all in one flex-wrap row */}
+      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Built-in presets */}
+        {TEXT_STYLE_PRESETS.map(({ label, preset }) => (
+          <button
+            key={label}
+            onClick={() => onApply(preset)}
+            title={`Apply ${label} style`}
+            style={{
+              background: 'var(--panel-alt)', border: '1px solid var(--border)',
+              borderRadius: 4, color: 'var(--muted)', cursor: 'pointer',
+              fontSize: 10, fontWeight: 600, padding: '2px 6px',
+              transition: 'all 0.1s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-dim)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--panel-alt)'; }}
+          >
+            {label}
+          </button>
+        ))}
+        {/* Saved style chips */}
+        {styles.map(s => (
+          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <button
+              onClick={() => onApply({
+                fontFamily: s.fontFamily, fontSize: s.fontSize,
+                fontWeight: s.fontWeight, fontStyle: s.fontStyle,
+                letterSpacing: s.letterSpacing, lineHeight: s.lineHeight,
+                color: s.color,
+              })}
+              title={`${s.fontFamily} ${s.fontSize}px / ${s.fontWeight}`}
+              style={{
+                background: 'var(--panel-alt)', border: '1px solid var(--border)',
+                borderRadius: '4px 0 0 4px', color: 'var(--text)', cursor: 'pointer',
+                fontSize: 10, fontWeight: 600, padding: '2px 6px',
+                fontFamily: s.fontFamily, transition: 'all 0.1s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text)'; }}
+            >
+              {s.name}
+            </button>
+            <button
+              onClick={() => handleDelete(s.id)}
+              title="Delete style"
+              style={{
+                background: 'var(--panel-alt)', border: '1px solid var(--border)', borderLeft: 'none',
+                borderRadius: '0 4px 4px 0', color: 'var(--muted)', cursor: 'pointer',
+                fontSize: 9, padding: '2px 5px', transition: 'all 0.1s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--error)'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--panel-alt)'; }}
+            >✕</button>
+          </div>
+        ))}
+        {/* Save-style button — inline with chips */}
+        {!saving && (
+          <button
+            onClick={() => setSaving(true)}
+            title="Save current text style"
+            style={{
+              background: 'none', border: '1px dashed var(--border)',
+              borderRadius: 4, color: 'var(--subtle)', cursor: 'pointer',
+              fontSize: 10, padding: '2px 6px',
+              transition: 'all 0.1s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--subtle)'; }}
+          >+</button>
+        )}
+      </div>
 
-      {/* Save current style */}
-      {saving ? (
+      {/* Save name input — only shown when saving */}
+      {saving && (
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <input
             type="text"
@@ -3932,21 +4107,8 @@ function SavedTextStylesRow({ shape, onApply }: {
               background: 'none', border: '1px solid var(--border)', borderRadius: 4,
               color: 'var(--muted)', cursor: 'pointer', fontSize: 10, padding: '3px 6px',
             }}
-          >Cancel</button>
+          >✕</button>
         </div>
-      ) : (
-        <button
-          onClick={() => setSaving(true)}
-          title="Save current text style"
-          style={{
-            background: 'none', border: '1px dashed var(--border)',
-            borderRadius: 4, color: 'var(--muted)', cursor: 'pointer',
-            fontSize: 10, padding: '3px 8px', alignSelf: 'flex-start',
-            transition: 'all 0.1s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}
-        >+ Save Style</button>
       )}
     </div>
   );
@@ -3968,81 +4130,42 @@ function TypographySection({ shape, onPreview, onChange }: { shape: Shape; onPre
   return (
     <PanelSection label="Typography">
 
-      {/* Text style presets */}
-      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 2 }}>
-        {TEXT_STYLE_PRESETS.map(({ label, preset }) => (
-          <button
-            key={label}
-            onClick={() => { onPreview(preset); onChange(preset); }}
-            title={`Apply ${label} style`}
-            style={{
-              background: 'var(--panel-alt)', border: '1px solid var(--border)',
-              borderRadius: 4, color: 'var(--muted)', cursor: 'pointer',
-              fontSize: 10, fontWeight: 600, padding: '3px 7px',
-              transition: 'all 0.1s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-dim)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'var(--panel-alt)'; }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Saved text styles */}
+      {/* Text style presets + saved styles + save button — all in one compact row */}
       <SavedTextStylesRow
         shape={shape}
         onApply={(patch) => { onPreview(patch); onChange(patch); }}
       />
 
-      {/* Text content */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={labelSt}>Content</span>
-        <textarea
-          value={shape.text}
-          rows={3}
-          onChange={(e) => onPreview({ text: e.target.value })}
-          onBlur={(e) => onChange({ text: e.target.value })}
-          onKeyDown={(e) => {
-            const isUndo = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z' || e.key === 'y' || e.key === 'Y');
-            if (!isUndo) e.stopPropagation(); // prevent canvas shortcuts while typing
-            if (e.key === 'Escape') (e.target as HTMLTextAreaElement).blur();
-          }}
-          style={{
-            ...inputSt, resize: 'vertical', minHeight: 56,
-            fontFamily: shape.fontFamily,
-            fontSize: shape.fontSize,
-            lineHeight: shape.lineHeight,
-          }}
-        />
-      </div>
-
-      {/* Font family */}
+      {/* Font family — most important, at the top */}
       <FontPicker
         value={shape.fontFamily}
         onPreview={(v) => onPreview({ fontFamily: v })}
         onCommit={(v) => onChange({ fontFamily: v })}
       />
 
-      {/* Color + size + weight */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={labelSt}>Color</span>
-          <ColorSwatchInput
-            value={shape.color}
-            onPreview={(v) => onPreview({ color: v })}
-            onCommit={(v) => onChange({ color: v })}
-          />
-        </div>
-        <FieldBox label="Size" value={shape.fontSize} min={8}
+      {/* Color + size + weight — inline labels to save vertical space */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        {/* Color swatch — no label needed, universally understood */}
+        <ColorSwatchInput
+          value={shape.color}
+          onPreview={(v) => onPreview({ color: v })}
+          onCommit={(v) => onChange({ color: v })}
+        />
+        <FieldBox label="Size" value={shape.fontSize} min={8} inline
           onPreview={(v) => onPreview({ fontSize: v })}
           onCommit={(v) => onChange({ fontSize: v })} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={labelSt}>Weight</span>
+        {/* Weight: inline "Wt" prefix inside a styled border wrapper */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'stretch', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 5, overflow: 'hidden', minWidth: 0 }}>
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: 'var(--subtle)',
+            padding: '0 3px 0 6px', display: 'flex', alignItems: 'center',
+            userSelect: 'none', flexShrink: 0, letterSpacing: '0.02em',
+          }}>Wt</span>
           <select
             value={shape.fontWeight}
             onChange={(e) => { onPreview({ fontWeight: e.target.value }); onChange({ fontWeight: e.target.value }); }}
-            style={selectSt}
+            onKeyDown={(e) => { const isUndo = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z'); if (!isUndo) e.stopPropagation(); }}
+            style={{ ...selectSt, border: 'none', borderRadius: 0, flex: 1, minWidth: 0, paddingLeft: 2 }}
           >
             {[
               ['100', 'Thin'],
@@ -4061,93 +4184,87 @@ function TypographySection({ shape, onPreview, onChange }: { shape: Shape; onPre
         </div>
       </div>
 
-      {/* Variable font weight slider — for variable fonts, this enables fine-grained weight between 100–900 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ ...labelSt, fontSize: 10 }}>Variable weight</span>
-          <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--muted)' }}>{shape.fontWeight}</span>
-        </div>
-        <input
-          type="range"
-          min={100}
-          max={900}
-          step={1}
-          value={parseInt(shape.fontWeight) || 400}
-          onChange={(e) => onPreview({ fontWeight: e.target.value })}
-          onMouseUp={(e) => onChange({ fontWeight: (e.target as HTMLInputElement).value })}
-          onTouchEnd={(e) => onChange({ fontWeight: (e.target as HTMLInputElement).value })}
-          style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
-          title="Drag for fine-grained weight control (useful for variable fonts)"
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 0 }}>
-          <span style={{ fontSize: 9, color: 'var(--subtle)' }}>Thin</span>
-          <span style={{ fontSize: 9, color: 'var(--subtle)' }}>Regular</span>
-          <span style={{ fontSize: 9, color: 'var(--subtle)' }}>Black</span>
-        </div>
+      {/* Style toggles: italic, underline, strikethrough + alignment */}
+      <div style={{ display: 'flex', gap: 4 }}>
+        {/* Italic */}
+        <ToggleBtn
+          active={shape.fontStyle === 'italic'}
+          title="Italic (⌘I)"
+          onClick={() => {
+            const v = shape.fontStyle === 'italic' ? 'normal' : 'italic';
+            onPreview({ fontStyle: v }); onChange({ fontStyle: v });
+          }}
+        ><em style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>I</em></ToggleBtn>
+
+        {/* Underline */}
+        <ToggleBtn
+          active={shape.textDecoration === 'underline'}
+          title="Underline (⌘U)"
+          onClick={() => {
+            const v = shape.textDecoration === 'underline' ? 'none' : 'underline';
+            onPreview({ textDecoration: v }); onChange({ textDecoration: v });
+          }}
+        ><span style={{ textDecoration: 'underline' }}>U</span></ToggleBtn>
+
+        {/* Strikethrough */}
+        <ToggleBtn
+          active={shape.textDecoration === 'line-through'}
+          title="Strikethrough"
+          onClick={() => {
+            const v = shape.textDecoration === 'line-through' ? 'none' : 'line-through';
+            onPreview({ textDecoration: v }); onChange({ textDecoration: v });
+          }}
+        ><span style={{ textDecoration: 'line-through' }}>S</span></ToggleBtn>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Align: left / center / right / justify */}
+        {(['left', 'center', 'right', 'justify'] as const).map((val) => (
+          <ToggleBtn
+            key={val}
+            active={shape.textAlign === val}
+            title={val === 'justify' ? 'Justify' : `Align ${val}`}
+            onClick={() => { onPreview({ textAlign: val }); onChange({ textAlign: val }); }}
+          >
+            <AlignIcon type={val} />
+          </ToggleBtn>
+        ))}
+      </div>
+
+      {/* Line height + letter spacing — inline labels to save vertical space */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <FieldBoxFloat label="Line" value={shape.lineHeight} min={0.5} step={0.05} decimals={2} inline
+          onPreview={(v) => onPreview({ lineHeight: v })}
+          onCommit={(v) => onChange({ lineHeight: v })} />
+        <FieldBoxFloat label="Tracking" value={shape.letterSpacing} step={1} decimals={0} inline
+          onPreview={(v) => onPreview({ letterSpacing: v })}
+          onCommit={(v) => onChange({ letterSpacing: v })} />
       </div>
 
       {/* Contrast ratio indicator */}
       <ContrastBadge textColor={shape.color} bgColor={shape.fill !== 'transparent' ? shape.fill : '#ffffff'} />
 
-      {/* Line height + letter spacing */}
-      <div style={{ display: 'flex', gap: 6 }}>
-        <FieldBoxFloat label="Line H" value={shape.lineHeight} min={0.5} step={0.05} decimals={2}
-          onPreview={(v) => onPreview({ lineHeight: v })}
-          onCommit={(v) => onChange({ lineHeight: v })} />
-        <FieldBoxFloat label="Tracking" value={shape.letterSpacing} step={1} decimals={0}
-          onPreview={(v) => onPreview({ letterSpacing: v })}
-          onCommit={(v) => onChange({ letterSpacing: v })} />
-      </div>
-
-      {/* Style toggles: italic, underline, strikethrough */}
+      {/* Text content — after visual props since you edit it on canvas */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={labelSt}>Style</span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {/* Italic */}
-          <ToggleBtn
-            active={shape.fontStyle === 'italic'}
-            title="Italic"
-            onClick={() => {
-              const v = shape.fontStyle === 'italic' ? 'normal' : 'italic';
-              onPreview({ fontStyle: v }); onChange({ fontStyle: v });
-            }}
-          ><em style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>I</em></ToggleBtn>
-
-          {/* Underline */}
-          <ToggleBtn
-            active={shape.textDecoration === 'underline'}
-            title="Underline"
-            onClick={() => {
-              const v = shape.textDecoration === 'underline' ? 'none' : 'underline';
-              onPreview({ textDecoration: v }); onChange({ textDecoration: v });
-            }}
-          ><span style={{ textDecoration: 'underline' }}>U</span></ToggleBtn>
-
-          {/* Strikethrough */}
-          <ToggleBtn
-            active={shape.textDecoration === 'line-through'}
-            title="Strikethrough"
-            onClick={() => {
-              const v = shape.textDecoration === 'line-through' ? 'none' : 'line-through';
-              onPreview({ textDecoration: v }); onChange({ textDecoration: v });
-            }}
-          ><span style={{ textDecoration: 'line-through' }}>S</span></ToggleBtn>
-
-          {/* Spacer */}
-          <div style={{ flex: 1 }} />
-
-          {/* Align: left / center / right / justify */}
-          {(['left', 'center', 'right'] as const).map((val) => (
-            <ToggleBtn
-              key={val}
-              active={shape.textAlign === val}
-              title={`Align ${val}`}
-              onClick={() => { onPreview({ textAlign: val }); onChange({ textAlign: val }); }}
-            >
-              <AlignIcon type={val} />
-            </ToggleBtn>
-          ))}
-        </div>
+        <span style={{ ...labelSt, opacity: 0.7 }}>Content</span>
+        <textarea
+          value={shape.text}
+          rows={2}
+          onChange={(e) => onPreview({ text: e.target.value })}
+          onBlur={(e) => onChange({ text: e.target.value })}
+          onKeyDown={(e) => {
+            const isUndo = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z' || e.key === 'y' || e.key === 'Y');
+            if (!isUndo) e.stopPropagation(); // prevent canvas shortcuts while typing
+            if (e.key === 'Escape') (e.target as HTMLTextAreaElement).blur();
+          }}
+          style={{
+            ...inputSt, resize: 'vertical', minHeight: 44,
+            fontFamily: shape.fontFamily,
+            fontSize: Math.min(shape.fontSize, 14),
+            lineHeight: shape.lineHeight,
+          }}
+        />
       </div>
 
     </PanelSection>
@@ -4155,12 +4272,13 @@ function TypographySection({ shape, onPreview, onChange }: { shape: Shape; onPre
 }
 
 // Compact SVG alignment icons
-function AlignIcon({ type }: { type: 'left' | 'center' | 'right' }) {
+function AlignIcon({ type }: { type: 'left' | 'center' | 'right' | 'justify' }) {
   // Each entry: [x, width] for a line, rendered at y = i*3.5
   const lines: [number, number][] =
-    type === 'left'   ? [[0, 10], [0, 7], [0, 8]] :
-    type === 'center' ? [[1, 10], [2, 6], [1, 8]] :
-                        [[0, 10], [3, 7], [2, 8]];
+    type === 'left'    ? [[0, 10], [0, 7], [0, 8]] :
+    type === 'center'  ? [[1, 10], [2, 6], [1, 8]] :
+    type === 'right'   ? [[0, 10], [3, 7], [2, 8]] :
+                         [[0, 10], [0, 10], [0, 10]]; // justify: all lines full width
   return (
     <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
       {lines.map(([x, w], i) => (
@@ -4193,7 +4311,7 @@ function ToggleBtn({ active, onClick, title, children }: {
 }
 
 // Float field box — supports decimals and step
-function FieldBoxFloat({ label, value, min, step = 0.1, decimals = 1, onPreview, onCommit }: {
+function FieldBoxFloat({ label, value, min, step = 0.1, decimals = 1, onPreview, onCommit, inline }: {
   label: string;
   value: number;
   min?: number;
@@ -4201,6 +4319,7 @@ function FieldBoxFloat({ label, value, min, step = 0.1, decimals = 1, onPreview,
   decimals?: number;
   onPreview: (v: number) => void;
   onCommit: (v: number) => void;
+  inline?: boolean; // label appears inside the input box as a prefix instead of above
 }) {
   const [local, setLocal] = useState(value.toFixed(decimals));
   const [focused, setFocused] = useState(false);
@@ -4226,13 +4345,13 @@ function FieldBoxFloat({ label, value, min, step = 0.1, decimals = 1, onPreview,
 
   const stepBtnSt: React.CSSProperties = {
     flexShrink: 0,
-    width: 28,
-    height: 18,
+    width: 22,
+    height: 14,
     background: 'none',
     border: 'none',
     color: 'var(--muted)',
     cursor: 'pointer',
-    fontSize: 9,
+    fontSize: 8,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -4242,14 +4361,22 @@ function FieldBoxFloat({ label, value, min, step = 0.1, decimals = 1, onPreview,
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-      {label && <span style={labelSt}>{label}</span>}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: inline ? 0 : 3, minWidth: 0 }}>
+      {label && !inline && <span style={labelSt}>{label}</span>}
       <div style={{
         display: 'flex', alignItems: 'stretch',
         background: 'var(--input-bg)', border: '1px solid var(--border)',
         borderRadius: 5, overflow: 'hidden',
         ...(focused ? { borderColor: 'var(--accent)', outline: '1px solid rgba(99,102,241,0.3)' } : {}),
       }}>
+        {/* Inline label prefix */}
+        {label && inline && (
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: 'var(--subtle)',
+            padding: '0 3px 0 6px', display: 'flex', alignItems: 'center',
+            userSelect: 'none', flexShrink: 0, letterSpacing: '0.02em',
+          }}>{label}</span>
+        )}
         <input
           type="number"
           value={local}
@@ -4260,13 +4387,19 @@ function FieldBoxFloat({ label, value, min, step = 0.1, decimals = 1, onPreview,
             const n = parseFloat(e.target.value);
             if (!isNaN(n)) onPreview(clamp(n));
           }}
-          onFocus={() => setFocused(true)}
+          onFocus={(e) => { setFocused(true); e.target.select(); }}
           onBlur={(e) => { setFocused(false); commit(e.target.value); }}
           onKeyDown={(e) => {
             const isUndo = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z' || e.key === 'y' || e.key === 'Y');
-            if (!isUndo) e.stopPropagation();
+            if (isUndo) {
+              commit((e.target as HTMLInputElement).value);
+              (e.target as HTMLInputElement).blur();
+              return;
+            }
+            e.stopPropagation();
             if (e.key === 'Escape') { (e.target as HTMLInputElement).blur(); return; }
             if (e.key === 'Enter') { commit((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).blur(); return; }
+            if (e.key === 'Tab') { commit((e.target as HTMLInputElement).value); return; }
             if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
               e.preventDefault();
               stepBy((e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1) * step);
@@ -4278,7 +4411,7 @@ function FieldBoxFloat({ label, value, min, step = 0.1, decimals = 1, onPreview,
           }}
           style={{
             flex: 1, width: '100%', background: 'none', border: 'none', outline: 'none',
-            color: 'var(--text)', fontSize: 12, padding: '6px 6px', minWidth: 0, alignSelf: 'center',
+            color: 'var(--text)', fontSize: 12, padding: '4px 6px', minWidth: 0, alignSelf: 'center',
           }}
         />
         {/* Stepper buttons — larger hit targets than native browser spinners */}
@@ -4375,9 +4508,8 @@ function FontPicker({ value, onPreview, onCommit }: {
   };
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={labelSt}>Font</span>
-      {/* Trigger */}
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      {/* Trigger — "Font" label is inlined as a prefix inside the button */}
       <button
         onClick={() => setOpen(o => !o)}
         style={{
@@ -4386,18 +4518,23 @@ function FontPicker({ value, onPreview, onCommit }: {
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: 0,
           fontFamily: value,
           color: 'var(--text)',
           border: open ? '1px solid var(--accent)' : '1px solid var(--border)',
-          padding: '5px 7px',
+          padding: '5px 7px 5px 0',
           background: 'var(--input-bg)',
           borderRadius: 5,
           width: '100%',
           boxSizing: 'border-box',
         }}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, color: 'var(--subtle)',
+          padding: '0 4px 0 7px', flexShrink: 0, letterSpacing: '0.02em',
+          fontFamily: 'system-ui, sans-serif',
+        }}>Font</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
           {displayName}
         </span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -4612,16 +4749,16 @@ function PositionSection({ shape, onPreview, onChange, isText }: {
 
   return (
     <PanelSection label="Position">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <FieldBox label="X" value={shape.x}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <FieldBox label="X" value={shape.x} inline
             onPreview={(v) => onPreview({ x: v })} onCommit={(v) => onChange({ x: v })} />
-          <FieldBox label="Y" value={shape.y}
+          <FieldBox label="Y" value={shape.y} inline
             onPreview={(v) => onPreview({ y: v })} onCommit={(v) => onChange({ y: v })} />
         </div>
         {/* W + H with aspect ratio lock */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-          <FieldBox label="W" value={shape.width} min={8}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <FieldBox label="W" value={shape.width} min={8} inline
             onPreview={(v) => handleWidthChange(v, true)}
             onCommit={(v) => handleWidthChange(v, false)} />
           {/* Lock button */}
@@ -4629,7 +4766,7 @@ function PositionSection({ shape, onPreview, onChange, isText }: {
             onClick={() => setLocked(l => !l)}
             title={locked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
             style={{
-              flexShrink: 0, width: 22, height: 28, marginBottom: 0,
+              flexShrink: 0, width: 22, height: 28,
               background: locked ? 'rgba(99,102,241,0.12)' : 'var(--input-bg)',
               border: `1px solid ${locked ? 'var(--accent)' : 'var(--border)'}`,
               borderRadius: 5, cursor: 'pointer',
@@ -4650,78 +4787,64 @@ function PositionSection({ shape, onPreview, onChange, isText }: {
           >
             <LockIcon locked={locked} />
           </button>
-          <FieldBox label="H" value={shape.height} min={8}
+          <FieldBox label="H" value={shape.height} min={8} inline
             onPreview={(v) => handleHeightChange(v, true)}
             onCommit={(v) => handleHeightChange(v, false)} />
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-          <FieldBox label="R°" value={Math.round(shape.rotation)}
+        {/* R° + Radius side by side */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <FieldBox label="R°" value={Math.round(shape.rotation)} inline
             onPreview={(v) => onPreview({ rotation: ((v % 360) + 360) % 360 })}
             onCommit={(v) => onChange({ rotation: ((v % 360) + 360) % 360 })} />
-          {/* Transform quick actions: rotate 90, flip H, flip V */}
-          <div style={{ display: 'flex', gap: 2, paddingBottom: 1 }}>
-            {([
-              {
-                title: 'Rotate 90° CW',
-                onClick: () => onChange({ rotation: ((Math.round(shape.rotation) + 90) % 360 + 360) % 360 }),
-                icon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M9.5 6A3.5 3.5 0 1 1 6 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                    <polyline points="6,1 8.5,2.5 6,4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ),
-              },
-              {
-                title: `Flip horizontal${shape.flipX ? ' (active)' : ''}`,
-                active: shape.flipX,
-                onClick: () => onChange({ flipX: !shape.flipX }),
-                icon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <line x1="6" y1="1" x2="6" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="1.5 1.5"/>
-                    <polyline points="3,4 1,6 3,8" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <polyline points="9,4 11,6 9,8" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ),
-              },
-              {
-                title: `Flip vertical${shape.flipY ? ' (active)' : ''}`,
-                active: shape.flipY,
-                onClick: () => onChange({ flipY: !shape.flipY }),
-                icon: (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="1.5 1.5"/>
-                    <polyline points="4,3 6,1 8,3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <polyline points="4,9 6,11 8,9" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ),
-              },
-            ] as { title: string; active?: boolean; onClick: () => void; icon: React.ReactNode }[]).map((btn, i) => (
-              <button
-                key={i}
-                title={btn.title}
-                onClick={btn.onClick}
-                style={{
-                  width: 26, height: 26, borderRadius: 5, border: '1px solid',
-                  borderColor: btn.active ? 'var(--accent)' : 'var(--border)',
-                  background: btn.active ? 'rgba(99,102,241,0.12)' : 'var(--input-bg)',
-                  color: btn.active ? 'var(--accent)' : 'var(--muted)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = btn.active ? 'var(--accent)' : 'var(--muted)';
-                  e.currentTarget.style.borderColor = btn.active ? 'var(--accent)' : 'var(--border)';
-                }}
-              >
-                {btn.icon}
-              </button>
-            ))}
-          </div>
+          {!isText && shape.type !== 'ellipse' && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <CornerRadiusRow shape={shape} onPreview={onPreview} onChange={onChange} />
+            </div>
+          )}
         </div>
-        {!isText && shape.type !== 'ellipse' && (
-          <CornerRadiusRow shape={shape} onPreview={onPreview} onChange={onChange} />
-        )}
+        {/* Transform quick actions: rotate 90, flip H, flip V */}
+        <div style={{ display: 'flex', gap: 4, width: '100%' }}>
+          {([
+            {
+              title: 'Rotate 90° CW',
+              label: '↻ 90°',
+              onClick: () => onChange({ rotation: ((Math.round(shape.rotation) + 90) % 360 + 360) % 360 }),
+            },
+            {
+              title: `Flip horizontal${shape.flipX ? ' (active)' : ''}`,
+              label: 'Flip H',
+              active: shape.flipX,
+              onClick: () => onChange({ flipX: !shape.flipX }),
+            },
+            {
+              title: `Flip vertical${shape.flipY ? ' (active)' : ''}`,
+              label: 'Flip V',
+              active: shape.flipY,
+              onClick: () => onChange({ flipY: !shape.flipY }),
+            },
+          ] as { title: string; label: string; active?: boolean; onClick: () => void }[]).map((btn, i) => (
+            <button
+              key={i}
+              title={btn.title}
+              onClick={btn.onClick}
+              style={{
+                flex: 1, height: 22, borderRadius: 4, border: '1px solid',
+                borderColor: btn.active ? 'var(--accent)' : 'var(--border)',
+                background: btn.active ? 'rgba(99,102,241,0.12)' : 'var(--input-bg)',
+                color: btn.active ? 'var(--accent)' : 'var(--muted)',
+                cursor: 'pointer', fontSize: 9, fontWeight: 600,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = btn.active ? 'var(--accent)' : 'var(--muted)';
+                e.currentTarget.style.borderColor = btn.active ? 'var(--accent)' : 'var(--border)';
+              }}
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
       </div>
     </PanelSection>
   );
@@ -4986,7 +5109,8 @@ function AutoLayoutSection({ shape, onPreview, onChange }: {
       {/* Section header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 12px 6px',
+        padding: isActive ? '8px 12px 5px' : '8px 12px',
+        minHeight: 37,
       }}>
         <span style={sectionLabelSt}>Auto layout</span>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -5004,14 +5128,26 @@ function AutoLayoutSection({ shape, onPreview, onChange }: {
               >↓</IconBtn>
             </>
           )}
-          <IconBtn
-            active={isActive}
-            onClick={() => {
-              const next: Partial<Shape> = { layout: isActive ? 'none' : 'row' };
-              onPreview(next); onChange(next);
-            }}
-            title={isActive ? 'Remove auto layout' : 'Add auto layout'}
-          >{isActive ? '✕' : '+'}</IconBtn>
+          {isActive ? (
+            <IconBtn
+              active
+              onClick={() => { const next: Partial<Shape> = { layout: 'none' }; onPreview(next); onChange(next); }}
+              title="Remove auto layout"
+            >✕</IconBtn>
+          ) : (
+            <button
+              onClick={() => { const next: Partial<Shape> = { layout: 'row' }; onPreview(next); onChange(next); }}
+              title="Add auto layout"
+              style={{
+                background: 'none', border: '1px solid transparent', cursor: 'pointer',
+                color: 'var(--muted)', fontSize: 14, lineHeight: 1,
+                width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 4, padding: 0, flexShrink: 0,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'none'; }}
+            >+</button>
+          )}
         </div>
       </div>
 
@@ -5209,6 +5345,7 @@ function ColorRow({
 }) {
   const [localColor, setLocalColor] = useState(color);
   const [localOpacity, setLocalOpacity] = useState(opacity);
+  const [showPalette, setShowPalette] = useState(false);
   const recentColors = useRecentColors();
 
   useEffect(() => { setLocalColor(color); }, [color]);
@@ -5255,39 +5392,6 @@ function ColorRow({
           onCommit={(v) => { onColorCommit(v); addRecentColor(v); }}
         />
 
-        {/* EyeDropper button (Chrome/Edge only) */}
-        {'EyeDropper' in window && (
-          <button
-            title="Pick color from screen (EyeDropper)"
-            onClick={async () => {
-              try {
-                const dropper = new (window as any).EyeDropper();
-                const result = await dropper.open();
-                if (result?.sRGBHex) {
-                  commitColor(result.sRGBHex);
-                  addRecentColor(result.sRGBHex);
-                }
-              } catch {
-                // user cancelled or not supported
-              }
-            }}
-            style={{
-              width: 24, height: 24, borderRadius: 4, border: '1px solid rgba(255,255,255,0.12)',
-              background: 'rgba(255,255,255,0.06)', cursor: 'pointer', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0,
-              color: 'rgba(255,255,255,0.7)',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.14)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M13.5 2.5a2.12 2.12 0 0 0-3 0L2 11l-.5 3.5 3.5-.5 8.5-8.5a2.12 2.12 0 0 0 0-3z"/>
-              <path d="m10.5 4.5 1 1"/>
-              <circle cx="3" cy="13" r=".5" fill="currentColor" stroke="none"/>
-            </svg>
-          </button>
-        )}
-
         {/* Hex input */}
         <input
           type="text"
@@ -5306,6 +5410,31 @@ function ColorRow({
           }}
           style={{ ...inputSt, flex: 1, fontFamily: 'monospace', minWidth: 0, textTransform: 'uppercase' }}
         />
+
+        {/* Palette toggle */}
+        <button
+          title={showPalette ? 'Hide palette' : 'Show palette'}
+          onClick={() => setShowPalette(p => !p)}
+          style={{
+            width: 24, height: 24, flexShrink: 0, borderRadius: 4,
+            border: `1px solid ${showPalette ? 'var(--accent)' : 'var(--border)'}`,
+            background: showPalette ? 'rgba(99,102,241,0.12)' : 'transparent',
+            color: showPalette ? 'var(--accent)' : 'var(--muted)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = showPalette ? 'var(--accent)' : 'var(--border)';
+            e.currentTarget.style.color = showPalette ? 'var(--accent)' : 'var(--muted)';
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="0.5" y="0.5" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="7.5" y="0.5" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="0.5" y="7.5" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="7.5" y="7.5" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1"/>
+          </svg>
+        </button>
 
         {/* Opacity % */}
         {onOpacityPreview && onOpacityCommit && (
@@ -5326,15 +5455,15 @@ function ColorRow({
                 if (!isUndo) e.stopPropagation();
                 if (e.key === 'Escape' || e.key === 'Enter') (e.target as HTMLInputElement).blur();
               }}
-              style={{ ...inputSt, width: 52, textAlign: 'right', paddingRight: 2 }}
+              style={{ ...inputSt, width: 44, textAlign: 'right' }}
             />
             <span style={{ ...labelSt, flexShrink: 0 }}>%</span>
           </>
         )}
       </div>
 
-      {/* Row 2: color swatches (recent + palette) */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+      {/* Row 2: color swatches (recent + palette) — collapsed by default */}
+      {showPalette && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         {swatches.map((hex) => {
           const isActive = hex.toLowerCase() === localColor.toLowerCase();
           return (
@@ -5360,10 +5489,10 @@ function ColorRow({
             />
           );
         })}
-      </div>
+      </div>}
 
-      {/* Row 3: document colors (if available and different from recent) */}
-      {docColors.length > 0 && (
+      {/* Row 3: document colors — shown with palette */}
+      {showPalette && docColors.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <span style={{ fontSize: 9, color: 'var(--subtle)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
             Document
@@ -5523,8 +5652,9 @@ function CollapsibleSection({
       <div
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: hasContent && !collapsed ? '10px 12px 6px' : '10px 12px',
+          padding: hasContent && !collapsed ? '8px 12px 5px' : '8px 12px',
           cursor: startCollapsed !== undefined ? 'pointer' : 'default',
+          minHeight: 32,
         }}
         onClick={startCollapsed !== undefined ? () => setCollapsed(c => !c) : undefined}
       >
@@ -5538,14 +5668,14 @@ function CollapsibleSection({
         </div>
         {(onAdd || onRemove) && (
           <button
-            onClick={(e) => { e.stopPropagation(); (onAdd ?? onRemove)?.(); }}
+            onClick={(e) => { e.stopPropagation(); if (onAdd) { setCollapsed(false); onAdd(); } else { onRemove?.(); } }}
             style={{
               background: 'none', border: '1px solid transparent', cursor: 'pointer',
-              color: 'var(--muted)', fontSize: 14, lineHeight: 1,
-              width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderRadius: 5, padding: 0, flexShrink: 0,
+              color: onRemove ? 'var(--muted)' : 'var(--muted)', fontSize: 14, lineHeight: 1,
+              width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 4, padding: 0, flexShrink: 0,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = onRemove ? '#ef4444' : 'var(--text)'; e.currentTarget.style.borderColor = onRemove ? 'rgba(239,68,68,0.3)' : 'var(--border)'; e.currentTarget.style.background = onRemove ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.05)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'none'; }}
             title={onAdd ? `Add ${label.toLowerCase()}` : `Remove ${label.toLowerCase()}`}
           >
@@ -5554,7 +5684,7 @@ function CollapsibleSection({
         )}
       </div>
       {hasContent && !collapsed && (
-        <div style={{ padding: '0 12px 12px' }}>{children}</div>
+        <div style={{ padding: '0 12px 10px' }}>{children}</div>
       )}
     </div>
   );
@@ -5576,7 +5706,8 @@ function PanelSection({ label, children, collapsible, collapsed, onToggle }: {
           onClick={onToggle}
           style={{
             width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-            padding: '10px 12px 8px', display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 12px 6px', display: 'flex', alignItems: 'center', gap: 6,
+            minHeight: 32,
           }}
         >
           <span style={{ ...sectionLabelSt, flex: 1, textAlign: 'left' }}>{label}</span>
@@ -5586,7 +5717,7 @@ function PanelSection({ label, children, collapsible, collapsed, onToggle }: {
           </svg>
         </button>
         {!collapsed && (
-          <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {children}
           </div>
         )}
@@ -5594,8 +5725,8 @@ function PanelSection({ label, children, collapsible, collapsed, onToggle }: {
     );
   }
   return (
-    <div style={{ borderBottom: '1px solid var(--border)', padding: '10px 12px 12px' }}>
-      <div style={{ marginBottom: 8 }}>
+    <div style={{ borderBottom: '1px solid var(--border)', padding: '8px 12px 10px' }}>
+      <div style={{ marginBottom: 6 }}>
         <span style={sectionLabelSt}>{label}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -5617,10 +5748,12 @@ function PanelSection({ label, children, collapsible, collapsed, onToggle }: {
 function VisualCornerRadiusPicker({
   tl, tr, br, bl,
   onCornerChange,
+  onAllCornersChange,
   onTogglePerCorner,
 }: {
   tl: number; tr: number; br: number; bl: number;
   onCornerChange: (idx: number, v: number) => void;
+  onAllCornersChange: (v: number) => void;
   onTogglePerCorner: () => void;
 }) {
   const [activeCorner, setActiveCorner] = useState<0 | 1 | 2 | 3>(0);
@@ -5736,7 +5869,7 @@ function VisualCornerRadiusPicker({
           {/* All-corners quick set */}
           <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
             {[0, 4, 8, 12, 20, 50].map(v => (
-              <button key={v} onClick={() => { [0, 1, 2, 3].forEach(i => onCornerChange(i, v)); }}
+              <button key={v} onClick={() => onAllCornersChange(v)}
                 style={{
                   flex: 1, fontSize: 9, padding: '2px 0', cursor: 'pointer', fontWeight: 600,
                   background: values.every(x => x === v) ? 'var(--accent)' : 'var(--panel-alt)',
@@ -5820,18 +5953,20 @@ function CornerRadiusRow({ shape, onPreview, onChange }: {
       <VisualCornerRadiusPicker
         tl={tl} tr={tr} br={br} bl={bl}
         onCornerChange={handleCornerChange}
+        onAllCornersChange={(v) => onChange({ borderRadius: v })}
         onTogglePerCorner={handleTogglePerCorner}
       />
     );
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <div style={{ flex: 1 }}>
         <FieldBox
-          label="Corner radius"
+          label="r"
           value={uniformValue}
           min={0}
+          inline
           onPreview={(v) => onPreview({ borderRadius: v })}
           onCommit={(v) => onChange({ borderRadius: v })}
         />
@@ -5840,7 +5975,7 @@ function CornerRadiusRow({ shape, onPreview, onChange }: {
         onClick={handleTogglePerCorner}
         title="Set each corner individually"
         style={{
-          width: 28, height: 28, flexShrink: 0, marginBottom: 1,
+          width: 28, height: 28, flexShrink: 0,
           background: 'var(--input-bg)', border: '1px solid var(--border)',
           borderRadius: 5, cursor: 'pointer', color: 'var(--muted)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
@@ -5889,12 +6024,13 @@ function CornerInput({ label, value, onChange }: { label: string; value: number;
   );
 }
 
-function FieldBox({ label, value, min, onPreview, onCommit }: {
+function FieldBox({ label, value, min, onPreview, onCommit, inline }: {
   label: string;
   value: number;
   min?: number;
   onPreview: (v: number) => void;
   onCommit: (v: number) => void;
+  inline?: boolean; // label appears inside the input box as a prefix instead of above
 }) {
   const [local, setLocal] = useState(String(Math.round(value)));
   const [focused, setFocused] = useState(false);
@@ -5919,13 +6055,13 @@ function FieldBox({ label, value, min, onPreview, onCommit }: {
 
   const stepBtnSt: React.CSSProperties = {
     flexShrink: 0,
-    width: 28,
-    height: 18,
+    width: 22,
+    height: 14,
     background: 'none',
     border: 'none',
     color: 'var(--muted)',
     cursor: 'pointer',
-    fontSize: 9,
+    fontSize: 8,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -5935,14 +6071,22 @@ function FieldBox({ label, value, min, onPreview, onCommit }: {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-      {label && <span style={labelSt}>{label}</span>}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: inline ? 0 : 3, minWidth: 0 }}>
+      {label && !inline && <span style={labelSt}>{label}</span>}
       <div style={{
         display: 'flex', alignItems: 'stretch',
         background: 'var(--input-bg)', border: '1px solid var(--border)',
         borderRadius: 5, overflow: 'hidden',
         ...(focused ? { borderColor: 'var(--accent)', outline: '1px solid rgba(99,102,241,0.3)' } : {}),
       }}>
+        {/* Inline label prefix */}
+        {label && inline && (
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: 'var(--subtle)',
+            padding: '0 3px 0 6px', display: 'flex', alignItems: 'center',
+            userSelect: 'none', flexShrink: 0, letterSpacing: '0.02em',
+          }}>{label}</span>
+        )}
         <input
           type="number"
           value={local}
@@ -5952,13 +6096,24 @@ function FieldBox({ label, value, min, onPreview, onCommit }: {
             const n = parseFloat(e.target.value);
             if (!isNaN(n)) onPreview(clamp(n));
           }}
-          onFocus={() => setFocused(true)}
+          onFocus={(e) => { setFocused(true); e.target.select(); }}
           onBlur={(e) => { setFocused(false); commit(e.target.value); }}
           onKeyDown={(e) => {
             const isUndo = (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z' || e.key === 'y' || e.key === 'Y');
-            if (!isUndo) e.stopPropagation();
+            if (isUndo) {
+              // Commit any in-progress edit before undo/redo fires, then blur
+              commit((e.target as HTMLInputElement).value);
+              (e.target as HTMLInputElement).blur();
+              return;
+            }
+            e.stopPropagation();
             if (e.key === 'Escape') { (e.target as HTMLInputElement).blur(); return; }
             if (e.key === 'Enter') { commit((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).blur(); return; }
+            if (e.key === 'Tab') {
+              // Allow natural tab order without stopping propagation
+              commit((e.target as HTMLInputElement).value);
+              return;
+            }
             if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
               e.preventDefault();
               step((e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
@@ -5970,7 +6125,7 @@ function FieldBox({ label, value, min, onPreview, onCommit }: {
           }}
           style={{
             flex: 1, width: '100%', background: 'none', border: 'none', outline: 'none',
-            color: 'var(--text)', fontSize: 12, padding: '6px 6px', minWidth: 0, alignSelf: 'center',
+            color: 'var(--text)', fontSize: 12, padding: '4px 6px', minWidth: 0, alignSelf: 'center',
           }}
         />
         {/* Stepper buttons — larger hit targets than native browser spinners */}
@@ -6133,7 +6288,7 @@ function ColorHarmony({ baseColor, onPick }: { baseColor: string; onPick: (color
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {harmonies.map(({ label, colors }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 9, color: 'var(--subtle)', width: 68, flexShrink: 0 }}>{label}</span>
+            <span style={{ fontSize: 9, color: 'var(--subtle)', width: 84, flexShrink: 0 }}>{label}</span>
             <div style={{ display: 'flex', gap: 2 }}>
               {colors.map(c => (
                 <button
@@ -6185,8 +6340,8 @@ function DocColors({ shapes, onPick }: { shapes: Shape[]; onPick: (color: string
 
   return (
     <div style={{ marginTop: 4 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
-        Document
+      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
+        Document Colors
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
         {colors.map(c => (

@@ -84,7 +84,6 @@ import { PrototypePanel, FlowArrowsOverlay, PrototypeHotspots, type Interaction 
 import { ContentFillPanel } from './components/canvas/ContentFillPanel';
 import { MinimapNavigator } from './components/canvas/MinimapNavigator';
 import { RedlineOverlay } from './components/canvas/RedlineOverlay';
-import { QuickActionsBar } from './components/canvas/QuickActionsBar';
 import { ColorBlindPanel } from './components/canvas/ColorBlindPanel';
 import { TextStylesPanel, type TextStyle } from './components/canvas/TextStylesPanel';
 import { PaletteExtractorPanel } from './components/canvas/PaletteExtractorPanel';
@@ -186,6 +185,11 @@ export default function App() {
 function AppShell() {
   const store = useProjectStore();
   const [showSettings, setShowSettings] = useState(false);
+
+  // Dev helper: expose store to console for data injection
+  useEffect(() => {
+    (window as Record<string, unknown>).__quillStore = store;
+  });
 
   // ⌘, opens settings
   useEffect(() => {
@@ -507,8 +511,6 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
   const [showContentFill, setShowContentFill] = useState(false);
   const [showMinimap, setShowMinimap] = useState(true);
   const [showRedlines, setShowRedlines] = useState(false);
-  const [showQuickActions, setShowQuickActions] = useState(true);
-  const [copiedStyle, setCopiedStyle] = useState<Partial<Shape> | null>(null);
   const [showColorBlind, setShowColorBlind] = useState(false);
   const [colorBlindFilter, setColorBlindFilter] = useState('');
   const [showTextStyles, setShowTextStyles] = useState(false);
@@ -703,6 +705,11 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
 
   const drawingRef = useRef(drawing);
   drawingRef.current = drawing;
+
+  // Dev helper: expose loadShapes so console can inject designs
+  useEffect(() => {
+    (window as Record<string, unknown>).__quillLoadShapes = (shapes: Shape[]) => drawing.loadShapes(shapes);
+  });
 
   // Initialise drawing from the active page's persisted shapes
   const initDoneRef = useRef(false);
@@ -1836,7 +1843,7 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
         components={componentLib.components}
         canSaveComponent={
           drawing.state.selectedIds.length >= 2 ||
-          (!!drawing.state.selectedId && !!drawing.state.shapes.find(s => s.id === drawing.state.selectedId && (s.isGroup || s.children.length > 0)))
+          (!!drawing.state.selectedId && !!drawing.state.shapes.find(s => s.id === drawing.state.selectedId && (s.isGroup || (s.children?.length ?? 0) > 0)))
         }
         onInsertComponent={(componentId, x, y) => {
           const shapes = componentLib.insertInstance(componentId, x, y);
@@ -2205,64 +2212,6 @@ function ProjectWorkspace({ projectId, initialProject, onSave, onRename, onSaveC
             height={canvasSize.height}
           />
 
-          {/* Quick Actions Bar */}
-          <QuickActionsBar
-            selectedShape={selectedShape ?? null}
-            selectedShapeIds={drawing.state.selectedIds.length > 0 ? drawing.state.selectedIds : (drawing.state.selectedId ? [drawing.state.selectedId] : [])}
-            shapes={drawing.state.shapes}
-            zoom={viewport.zoom}
-            panX={viewport.panX}
-            panY={viewport.panY}
-            canvasWidth={canvasSize.width}
-            canvasHeight={canvasSize.height}
-            onDuplicate={() => { drawing.duplicate(); }}
-            onDelete={() => { drawing.deleteSelected(); }}
-            onToggleLock={() => {
-              const s = selectedShape;
-              if (s) drawingRef.current.updateShape(s.id, { locked: !s.locked });
-            }}
-            onToggleHide={() => {
-              const s = selectedShape;
-              if (s) drawingRef.current.updateShape(s.id, { hidden: !s.hidden });
-            }}
-            onBringToFront={() => drawing.bringToFront()}
-            onSendToBack={() => drawing.sendToBack()}
-            onFlipH={() => {
-              const s = selectedShape;
-              if (s) drawingRef.current.updateShape(s.id, { flipX: !s.flipX });
-            }}
-            onFlipV={() => {
-              const s = selectedShape;
-              if (s) drawingRef.current.updateShape(s.id, { flipY: !s.flipY });
-            }}
-            onOpacityChange={(opacity) => {
-              const ids = drawing.state.selectedIds.length > 0 ? drawing.state.selectedIds : (drawing.state.selectedId ? [drawing.state.selectedId] : []);
-              for (const id of ids) drawingRef.current.updateShape(id, { opacity });
-            }}
-            onCopyStyle={() => {
-              const s = selectedShape;
-              if (!s) return;
-              setCopiedStyle({
-                fill: s.fill, fillType: s.fillType, fillOpacity: s.fillOpacity,
-                gradientStops: s.gradientStops, gradientAngle: s.gradientAngle,
-                stroke: s.stroke, strokeWidth: s.strokeWidth,
-                borderRadius: s.borderRadius,
-                opacity: s.opacity,
-                shadows: s.shadows,
-                noiseOpacity: s.noiseOpacity,
-                filterBlur: s.filterBlur, filterBrightness: s.filterBrightness,
-              });
-              showToast('Style copied', 'action');
-            }}
-            onPasteStyle={() => {
-              if (!copiedStyle) return;
-              const ids = drawing.state.selectedIds.length > 0 ? drawing.state.selectedIds : (drawing.state.selectedId ? [drawing.state.selectedId] : []);
-              for (const id of ids) drawingRef.current.updateShape(id, copiedStyle);
-              showToast(`Style applied to ${ids.length} shape${ids.length !== 1 ? 's' : ''}`, 'action');
-            }}
-            hasCopiedStyle={copiedStyle !== null}
-            enabled={showQuickActions}
-          />
 
           {/* Smart Spacing Advisor overlay — gap lines rendered over canvas */}
           {showSpacingAdvisor && (

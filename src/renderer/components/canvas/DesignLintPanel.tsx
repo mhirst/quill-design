@@ -61,7 +61,7 @@ function computeIssues(shapes: Shape[]): LintIssue[] {
   for (const text of textShapes) {
     const textColor = text.color ?? '#000000';
     // Find the shape underneath (approximate: check fill of overlapping shapes)
-    const bgColor = text.fill !== 'transparent' ? text.fill : '#ffffff';
+    const bgColor = (text.fill && text.fill !== 'transparent') ? text.fill : '#ffffff';
     const ratio = contrastRatio(textColor, bgColor);
     if (ratio < 3.0) {
       issues.push({
@@ -180,7 +180,7 @@ function computeIssues(shapes: Shape[]): LintIssue[] {
   // ── Rule 8: Empty or untitled shapes ──────────────────────────────────────
   const untitled = visibleShapes.filter(s => {
     const defaultNames = ['Rectangle', 'Ellipse', 'Frame', 'Text', 'Path'];
-    return defaultNames.some(n => s.name === n || s.name.startsWith(`${n} `));
+    return typeof s.name === 'string' && defaultNames.some(n => s.name === n || s.name.startsWith(`${n} `));
   });
   if (untitled.length > 3 && visibleShapes.length > 5) {
     issues.push({
@@ -280,7 +280,9 @@ export function DesignLintPanel({ open, onClose, shapes, onSelectShape }: Props)
   const [filter, setFilter] = useState<'all' | Severity>('all');
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const issues = useMemo(() => computeIssues(shapes), [shapes, refreshKey]);
+  const issues = useMemo(() => {
+    try { return computeIssues(shapes); } catch { return []; }
+  }, [shapes, refreshKey]);
 
   const filtered = filter === 'all' ? issues : issues.filter(i => i.severity === filter);
   const errorCount = issues.filter(i => i.severity === 'error').length;
