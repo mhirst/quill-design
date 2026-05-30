@@ -802,6 +802,10 @@ export function CanvasOverlay({
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
 
+      // Comment mode: don't interfere — CommentPinsOverlay handles the click
+      // to place a pin. Otherwise we'd start a marquee selection underneath.
+      if (commentMode) return;
+
       // Notify parent of any canvas interaction (used to auto-collapse chat bar)
       onCanvasPointerDown?.();
 
@@ -868,7 +872,7 @@ export function CanvasOverlay({
       // Start marquee selection drag
       dragRef.current = { type: 'marquee', originX: x, originY: y };
     },
-    [activeTool, screenToCanvas, onDrawStart, onSelect, onPenClick, onPenCommit, onCanvasPointerDown, onResizeStart] // pan/zoom/selectedShape read from refs
+    [activeTool, screenToCanvas, onDrawStart, onSelect, onPenClick, onPenCommit, onCanvasPointerDown, onResizeStart, commentMode] // pan/zoom/selectedShape read from refs
   );
 
   const handleShapeContextMenu = useCallback(
@@ -1356,15 +1360,15 @@ export function CanvasOverlay({
   return (
     <div
       ref={overlayRef}
-      onMouseDown={isSelectionPassthrough ? undefined : handleOverlayMouseDown}
-      onDoubleClick={isSelectionPassthrough ? undefined : handleDoubleClick}
-      onContextMenu={isSelectionPassthrough ? undefined : handleOverlayContextMenu}
+      onMouseDown={isSelectionPassthrough || commentMode ? undefined : handleOverlayMouseDown}
+      onDoubleClick={isSelectionPassthrough || commentMode ? undefined : handleDoubleClick}
+      onContextMenu={isSelectionPassthrough || commentMode ? undefined : handleOverlayContextMenu}
       onMouseLeave={() => setCursorPos(null)}
       style={{
         position: 'absolute',
         inset: 0,
         overflow: 'hidden',
-        cursor: isInteracting ? (isDraggingMove ? 'grabbing' : 'crosshair') : toolCursor(activeTool, false),
+        cursor: commentMode ? 'crosshair' : isInteracting ? (isDraggingMove ? 'grabbing' : 'crosshair') : toolCursor(activeTool, false),
         zIndex: 10,
         background: hasIframeContent ? 'transparent' : (canvasBgColor ?? 'var(--canvas-bg)'),
         backgroundImage: computedBgImage,
